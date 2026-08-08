@@ -32,7 +32,7 @@ class SmtpE2eTest {
             val port = environmentVariable("SMTP_E2E_PORT")?.toInt() ?: DEFAULT_PORT
 
             withContext(Dispatchers.Default) {
-                val transport = KtorTcpTransport.connect(host, port)
+                val transport = connectSmtp(host, port)
                 val session = Conversation(transport)
 
                 try {

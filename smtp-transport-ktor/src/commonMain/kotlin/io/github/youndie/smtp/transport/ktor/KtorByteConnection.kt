@@ -1,6 +1,7 @@
 package io.github.youndie.smtp.transport.ktor
 
-import io.github.youndie.smtp.transport.SmtpTransport
+import io.github.youndie.smtp.transport.ByteConnection
+import io.github.youndie.smtp.transport.LineFramedTransport
 import io.github.youndie.smtp.transport.SmtpTransportException
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.Socket
@@ -9,13 +10,13 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
-import io.ktor.utils.io.readLine
-import io.ktor.utils.io.writeString
+import io.ktor.utils.io.readAvailable
+import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 
 /**
- * A TCP transport over `ktor-network`.
+ * A TCP byte pipe over `ktor-network`.
  *
  * The only place in the project that mentions Ktor at all (docs/research/research-architecture.md,
  * decision D1). Ktor is taken for exactly one thing: a coroutine-aware selector already ported to
@@ -26,24 +27,27 @@ import kotlinx.coroutines.Dispatchers
  * Reads and writes go through two independent channels, so a reply can be read while a command
  * group is still being written — the condition PIPELINING needs (`docs/rfc/rfc2920.txt:183`).
  */
-public class KtorTcpTransport internal constructor(
+public class KtorByteConnection internal constructor(
     private val selector: SelectorManager,
     private val socket: Socket,
     private val input: ByteReadChannel,
     private val output: ByteWriteChannel,
-) : SmtpTransport {
-    override suspend fun readLine(): String =
+) : ByteConnection {
+    override suspend fun read(destination: ByteArray): Int =
         try {
-            input.readLine()
+            input.readAvailable(destination)
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Throwable) {
-            throw SmtpTransportException("Failed to read a line from ${socket.remoteAddress}", cause)
-        } ?: throw SmtpTransportException("Connection closed while waiting for a reply line")
+            throw SmtpTransportException("Failed to read from ${socket.remoteAddress}", cause)
+        }
 
-    override suspend fun write(data: String) {
+    override suspend fun write(
+        source: ByteArray,
+        length: Int,
+    ) {
         try {
-            output.writeString(data)
+            output.writeFully(source, 0, length)
             output.flush()
         } catch (cause: CancellationException) {
             throw cause
@@ -64,7 +68,7 @@ public class KtorTcpTransport internal constructor(
         public suspend fun connect(
             host: String,
             port: Int,
-        ): KtorTcpTransport {
+        ): KtorByteConnection {
             val selector = SelectorManager(Dispatchers.Default)
             val socket =
                 try {
@@ -76,7 +80,7 @@ public class KtorTcpTransport internal constructor(
                     throw SmtpTransportException("Failed to connect to $host:$port", cause)
                 }
 
-            return KtorTcpTransport(
+            return KtorByteConnection(
                 selector = selector,
                 socket = socket,
                 input = socket.openReadChannel(),
@@ -85,3 +89,13 @@ public class KtorTcpTransport internal constructor(
         }
     }
 }
+
+/**
+ * Connects and wraps the connection in line framing — what a session needs.
+ *
+ * The result exposes `upgrade`, which is where TLS is inserted on M4.
+ */
+public suspend fun connectSmtp(
+    host: String,
+    port: Int,
+): LineFramedTransport = LineFramedTransport(KtorByteConnection.connect(host, port))

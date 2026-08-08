@@ -1,6 +1,5 @@
 package io.github.youndie.smtp.transport.ktor
 
-import io.github.youndie.smtp.protocol.SmtpCommand
 import io.github.youndie.smtp.transport.SmtpTransportException
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.InetSocketAddress
@@ -19,33 +18,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * The Ktor-backed TCP transport, checked against an in-process server so that the test needs no
+ * The Ktor-backed byte pipe, checked against an in-process server so that the test needs no
  * container and no network beyond the loopback interface.
  */
-class KtorTcpTransportTest {
+class KtorByteConnectionTest {
     @Test
-    fun `lines are split on CRLF`() =
-        withServer(
-            script = { _, output ->
-                output.writeString("220 smtp.example.com ESMTP\r\n250-PIPELINING\r\n250 SIZE 100\r\n")
-                output.flush()
-            },
-        ) { transport ->
-            assertEquals("220 smtp.example.com ESMTP", transport.readLine())
-            assertEquals("250-PIPELINING", transport.readLine())
-            assertEquals("250 SIZE 100", transport.readLine())
-        }
-
-    @Test
-    fun `what the protocol layer encodes is what reaches the server`() {
+    fun `bytes travel in both directions`() {
         var received: String? = null
 
         withServer(
-            script = { input, _ ->
+            script = { input, output ->
+                output.writeString("220 smtp.example.com ESMTP\r\n")
+                output.flush()
                 received = input.readLine()
             },
         ) { transport ->
-            transport.write(SmtpCommand.Ehlo("client.example.com").encode())
+            assertEquals("220 smtp.example.com ESMTP", transport.readLine())
+            transport.write("EHLO client.example.com\r\n")
         }
 
         assertEquals("EHLO client.example.com", received)
@@ -68,7 +57,7 @@ class KtorTcpTransportTest {
      */
     private fun withServer(
         script: suspend (input: io.ktor.utils.io.ByteReadChannel, output: io.ktor.utils.io.ByteWriteChannel) -> Unit,
-        block: suspend (KtorTcpTransport) -> Unit,
+        block: suspend (io.github.youndie.smtp.transport.LineFramedTransport) -> Unit,
     ) = runTest {
         withContext(Dispatchers.Default) {
             val selector = SelectorManager(Dispatchers.Default)
@@ -84,7 +73,7 @@ class KtorTcpTransportTest {
                             }
                         }
 
-                    val transport = KtorTcpTransport.connect("127.0.0.1", port)
+                    val transport = connectSmtp("127.0.0.1", port)
                     try {
                         block(transport)
                     } finally {
