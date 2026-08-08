@@ -13,8 +13,31 @@ jobs:
   # The closing run of a milestone: on Linux the linuxX64Test task is enabled and the tests really
   # do run. They cannot run on macOS, which is why the local loop uses macosArm64 — see research D9.
   linux:
-    name: linuxX64 + jvm + ktlint
+    name: linuxX64 + jvm + ktlint + E2E
     runs-on: ubuntu-latest
+
+    # The same server as in docker-compose.yml. Kept in sync by hand: GitHub Actions cannot start
+    # a compose file, and a job that quietly runs without the server would turn the E2E test into
+    # a gate that disables itself — which is what SMTP_E2E_REQUIRED below prevents.
+    services:
+      mailpit:
+        image: axllent/mailpit:v1.30.7
+        ports:
+          - 1025:1025
+          - 8025:8025
+        env:
+          MP_SMTP_AUTH_ACCEPT_ANY: "true"
+          MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+        options: >-
+          --health-cmd "/mailpit readyz"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+
+    env:
+      SMTP_E2E_HOST: 127.0.0.1
+      SMTP_E2E_REQUIRED: "1"
+
     steps:
       - uses: actions/checkout@v5
 

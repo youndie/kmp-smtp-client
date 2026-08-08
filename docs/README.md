@@ -29,6 +29,8 @@
   По нему пишутся тесты.
 - [services/smtp-core.md](services/smtp-core.md) — модуль ядра: зона ответственности, якоря кода,
   грабли.
+- [services/smtp-transport-ktor.md](services/smtp-transport-ktor.md) — TCP-транспорт и как гонять
+  E2E против сервера из `docker-compose.yml`.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M10 и задачи `M-NN`.
 
@@ -47,10 +49,10 @@
 - [ ] `feature-authentication` — M5
 - [ ] `feature-tls` — M4
 
-### Modules (1/7)
+### Modules (2/7)
 - [x] [smtp-core](services/smtp-core.md) — протокол и домен, без I/O
+- [x] [smtp-transport-ktor](services/smtp-transport-ktor.md) — TCP поверх ktor-network
 - [ ] `smtp-client` — M2
-- [ ] `smtp-transport-ktor` — M3
 - [ ] `smtp-testing` — M3
 - [ ] `smtp-tls-openssl` — M4
 - [ ] `smtp-sasl` — M5
