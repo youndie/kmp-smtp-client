@@ -14,6 +14,14 @@ public data class SmtpReply(
     public val isPositiveCompletion: Boolean
         get() = code.severity == SmtpReplySeverity.POSITIVE_COMPLETION
 
+    /**
+     * Расширенный код состояния, если сервер его прислал (`docs/rfc/rfc2034.txt:100`).
+     *
+     * `null` означает «сервер не прислал» — а не «всё хорошо».
+     */
+    public val enhancedStatus: EnhancedStatusCode?
+        get() = TODO("M-13")
+
     public companion object {
         /**
          * Разбирает ответ целиком: строки без завершающего `CRLF`, последняя обязана быть
