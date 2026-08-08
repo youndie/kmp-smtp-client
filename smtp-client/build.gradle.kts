@@ -1,5 +1,5 @@
 plugins {
-    id("smtp.kmp")
+    id("smtp.kmp.web")
 }
 
 kotlin {
