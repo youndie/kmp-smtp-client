@@ -27,11 +27,10 @@
   Проверенные факты о Ktor и Kotlin/Native, принятые решения, риски, открытые вопросы.
 - [api/protocol-smtp.md](api/protocol-smtp.md) — контракт SMTP на проводе с ссылками на строки RFC.
   По нему пишутся тесты.
+- [services/smtp-core.md](services/smtp-core.md) — модуль ядра: зона ответственности, якоря кода,
+  грабли.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M10 и задачи `M-NN`.
-
-- [services/smtp-core.md](services/smtp-core.md) — модуль ядра: зона ответственности, якоря кода,
-  грабли сборки.
 
 `features/` пока пуст: фичу описывать нечем, пока нет сессии. Первая появится на M2.
 
