@@ -33,6 +33,8 @@
   грабли.
 - [services/smtp-client.md](services/smtp-client.md) — сессия, транзакции, таймауты.
 - [services/smtp-testing.md](services/smtp-testing.md) — сценарный транспорт для тестов.
+- [services/smtp-tls-openssl.md](services/smtp-tls-openssl.md) — TLS: memory BIO, проверка
+  сертификата, грабли cinterop.
 - [services/smtp-transport-ktor.md](services/smtp-transport-ktor.md) — TCP-транспорт и как гонять
   E2E против сервера из `docker-compose.yml`.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
@@ -51,12 +53,12 @@
 - [ ] `feature-tls` — M4
 - [ ] `feature-authentication` — M5
 
-### Modules (4/7)
+### Modules (5/7)
 - [x] [smtp-core](services/smtp-core.md) — протокол и домен, без I/O
 - [x] [smtp-client](services/smtp-client.md) — сессия и транзакции
 - [x] [smtp-transport-ktor](services/smtp-transport-ktor.md) — TCP поверх ktor-network
 - [x] [smtp-testing](services/smtp-testing.md) — сценарный транспорт
-- [ ] `smtp-tls-openssl` — M4
+- [x] [smtp-tls-openssl](services/smtp-tls-openssl.md) — TLS через OpenSSL, только нативные таргеты
 - [ ] `smtp-sasl` — M5
 - [ ] `smtp-mime` — M9
 
