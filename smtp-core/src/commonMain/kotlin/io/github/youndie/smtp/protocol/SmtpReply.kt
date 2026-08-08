@@ -20,7 +20,14 @@ public data class SmtpReply(
      * `null` означает «сервер не прислал» — а не «всё хорошо».
      */
     public val enhancedStatus: EnhancedStatusCode?
-        get() = TODO("M-13")
+        get() {
+            val firstWord = lines.first().substringBefore(' ')
+            val parsed = EnhancedStatusCode.parseOrNull(firstWord) ?: return null
+
+            // rfc2034.txt:105: класс расширенного кода обязан совпадать с первой цифрой ответа.
+            // Несогласованное значение — просто текст; выдать его за код хуже, чем потерять.
+            return parsed.takeIf { it.statusClass == code.value / 100 }
+        }
 
     public companion object {
         /**
