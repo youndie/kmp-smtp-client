@@ -54,7 +54,8 @@ class KtorTcpTransportTest {
     @Test
     fun `a connection closed mid-session is a transport failure`() =
         withServer(
-            script = { _, _ -> /* the server says nothing and hangs up */ },
+            // The server says nothing and hangs up.
+            script = { _, _ -> },
         ) { transport ->
             assertFailsWith<SmtpTransportException> { transport.readLine() }
         }
