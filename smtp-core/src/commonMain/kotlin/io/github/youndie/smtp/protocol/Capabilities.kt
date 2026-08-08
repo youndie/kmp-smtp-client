@@ -35,10 +35,12 @@ public class Capabilities internal constructor(
      * `null` означает «предел неизвестен»: сервер либо не назвал число, либо назвал `0`, что по
      * `docs/rfc/rfc1870.txt:79` значит «фиксированного предела нет». Это **не** ноль байт.
      */
-    public val maxMessageSize: Long? get() = TODO("M-15")
+    public val maxMessageSize: Long?
+        get() = parametersOf(SIZE).firstOrNull()?.toLongOrNull()?.takeIf { it > 0 }
 
     /** Механизмы SASL из `AUTH` в верхнем регистре — `docs/rfc/rfc4954.txt`. */
-    public val authMechanisms: Set<String> get() = TODO("M-15")
+    public val authMechanisms: Set<String>
+        get() = parametersOf(AUTH).mapTo(LinkedHashSet()) { it.uppercase() }
 
     public companion object {
         private const val PIPELINING = "PIPELINING"
@@ -51,6 +53,24 @@ public class Capabilities internal constructor(
         private const val SIZE = "SIZE"
         private const val AUTH = "AUTH"
 
-        public fun parse(reply: SmtpReply): Capabilities = TODO("M-15")
+        public fun parse(reply: SmtpReply): Capabilities {
+            if (reply.code != SmtpReplyCode(EHLO_OK)) {
+                // rfc5321.txt:1841: расширения объявляются только положительным ответом 250.
+                throw SmtpProtocolException("Ответ на EHLO не 250, расширений в нём нет: ${reply.code}")
+            }
+
+            val entries = LinkedHashMap<String, List<String>>()
+            // Первая строка — Domain [SP ehlo-greet], а не ehlo-line (rfc5321.txt:1841).
+            for (line in reply.lines.drop(1)) {
+                val tokens = line.split(' ').filter { it.isNotEmpty() }
+                val keyword = tokens.firstOrNull() ?: continue
+                // rfc5321.txt:1869: ключевые слова обрабатываются регистронезависимо.
+                entries[keyword.uppercase()] = tokens.drop(1)
+            }
+
+            return Capabilities(reply.lines.first(), entries)
+        }
+
+        private const val EHLO_OK = 250
     }
 }
