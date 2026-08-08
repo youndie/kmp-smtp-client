@@ -232,7 +232,41 @@ public class SmtpSession internal constructor(
     public suspend fun authenticate(
         mechanism: SaslMechanism,
         allowOverPlaintext: Boolean = false,
-    ): Unit = TODO("M-51")
+    ) {
+        if (!isEncrypted && !allowOverPlaintext) {
+            throw SmtpProtocolException(
+                "Refusing to send credentials over a cleartext connection. Run STARTTLS first, " +
+                    "or pass allowOverPlaintext = true if the channel is protected in a way this " +
+                    "library cannot see.",
+            )
+        }
+
+        var reply = begin(mechanism)
+
+        while (reply.code.severity == SmtpReplySeverity.POSITIVE_INTERMEDIATE) {
+            val challenge = decodeChallenge(reply, mechanism)
+            val response =
+                try {
+                    mechanism.respond(challenge)
+                } catch (cause: SaslException) {
+                    cancel()
+                    throw cause
+                }
+            reply = exchangeRaw(Base64.encode(response), "the SASL response")
+        }
+
+        if (!reply.isPositiveCompletion) throw SmtpRefusedException("AUTH", reply)
+
+        if (!mechanism.isComplete) {
+            throw SaslException(
+                "The server reported success before ${mechanism.name} was satisfied; " +
+                    "it has not proven who it is",
+            )
+        }
+
+        announced.markStale()
+        identify()
+    }
 
     /**
      * Sends `AUTH`, using the initial response only when it fits.
@@ -241,6 +275,46 @@ public class SmtpSession internal constructor(
      * limit, the client **must not** use that parameter and has to send the same bytes as an
      * ordinary response instead. OAuth tokens hit this routinely.
      */
+    private suspend fun begin(mechanism: SaslMechanism): SmtpReply {
+        val initial =
+            mechanism.initialResponse() ?: return exchange(SmtpCommand.Auth(mechanism.name), "AUTH", authTimeout)
+
+        val encoded = if (initial.isEmpty()) EMPTY_INITIAL_RESPONSE else Base64.encode(initial)
+        val withInitial = SmtpCommand.Auth(mechanism.name, encoded)
+        if (withInitial.fitsLineLimit) return exchange(withInitial, "AUTH", authTimeout)
+
+        val started = exchange(SmtpCommand.Auth(mechanism.name), "AUTH", authTimeout)
+        if (started.code.severity != SmtpReplySeverity.POSITIVE_INTERMEDIATE) return started
+        return exchangeRaw(encoded, "the SASL response")
+    }
+
+    private fun decodeChallenge(
+        reply: SmtpReply,
+        mechanism: SaslMechanism,
+    ): ByteArray {
+        val text = reply.lines.first()
+        if (text.isEmpty()) return ByteArray(0)
+
+        return try {
+            Base64.decode(text)
+        } catch (cause: IllegalArgumentException) {
+            throw SaslException("${mechanism.name}: the server challenge is not valid base64: '$text'", cause)
+        }
+    }
+
+    /** Cancels the exchange with a single `*` — `docs/rfc/rfc4954.txt:194`. */
+    private suspend fun cancel() {
+        runCatching { exchangeRaw(SASL_CANCEL, "the reply to a cancelled SASL exchange") }
+    }
+
+    private suspend fun exchangeRaw(
+        line: String,
+        what: String,
+    ): SmtpReply {
+        write(line + CRLF, "sending $what", authTimeout)
+        return readReply("the reply to $what", authTimeout)
+    }
+
     private val authTimeout get() = config.timeouts.otherCommands
 
     internal suspend fun handshake() {

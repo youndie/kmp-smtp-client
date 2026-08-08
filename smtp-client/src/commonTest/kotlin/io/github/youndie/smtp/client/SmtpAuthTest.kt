@@ -137,7 +137,9 @@ class SmtpAuthTest {
             // command to exceed this length, the client MUST NOT use the initial response
             // parameter". OAuth tokens are long enough for this to be the normal path.
             val token = ByteArray(600) { 'x'.code.toByte() }
-            val encoded = kotlin.io.encoding.Base64.encode(token)
+            val encoded =
+                kotlin.io.encoding.Base64
+                    .encode(token)
 
             val transport =
                 scriptedTransport {
