@@ -12,14 +12,40 @@ public class Capabilities internal constructor(
     public val greeting: String,
     private val entries: Map<String, List<String>>,
 ) {
+    private var stale = false
+
+    /**
+     * Marks the value as belonging to a phase that has ended.
+     *
+     * Called by the session layer after `STARTTLS` (`docs/rfc/rfc3207.txt:210`) and after `AUTH`
+     * with a security layer (`docs/rfc/rfc4954.txt:297`), where the client **must** discard
+     * everything it learned earlier. Every accessor below then throws instead of answering, so a
+     * value kept across the boundary fails loudly rather than quietly enabling a downgrade.
+     *
+     * Not meant to be called from outside a session.
+     */
+    public fun markStale() {
+        stale = true
+    }
+
     /** The announced keywords, upper-cased. */
-    public val keywords: Set<String> get() = entries.keys
+    public val keywords: Set<String> get() = fresh().keys
 
     /** Keywords are case-insensitive — `docs/rfc/rfc5321.txt:1869`. */
-    public operator fun contains(keyword: String): Boolean = keyword.uppercase() in entries
+    public operator fun contains(keyword: String): Boolean = keyword.uppercase() in fresh()
 
     /** Parameters of a keyword; empty both when there are none and when the keyword is absent. */
-    public fun parametersOf(keyword: String): List<String> = entries[keyword.uppercase()].orEmpty()
+    public fun parametersOf(keyword: String): List<String> = fresh()[keyword.uppercase()].orEmpty()
+
+    private fun fresh(): Map<String, List<String>> {
+        if (stale) {
+            throw SmtpProtocolException(
+                "These capabilities were announced before STARTTLS or AUTH and must not be used: " +
+                    "the client is required to discard them (docs/rfc/rfc3207.txt:210)",
+            )
+        }
+        return entries
+    }
 
     public val supportsPipelining: Boolean get() = PIPELINING in this
     public val supportsStartTls: Boolean get() = STARTTLS in this

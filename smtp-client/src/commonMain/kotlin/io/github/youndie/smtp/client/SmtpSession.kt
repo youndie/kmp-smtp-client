@@ -1,12 +1,21 @@
 package io.github.youndie.smtp.client
 
 import io.github.youndie.smtp.protocol.Capabilities
+import io.github.youndie.smtp.protocol.MailData
 import io.github.youndie.smtp.protocol.Mailbox
+import io.github.youndie.smtp.protocol.SmtpCommand
+import io.github.youndie.smtp.protocol.SmtpProtocolException
+import io.github.youndie.smtp.protocol.SmtpRefusedException
 import io.github.youndie.smtp.protocol.SmtpReply
+import io.github.youndie.smtp.protocol.SmtpReplyReader
+import io.github.youndie.smtp.protocol.SmtpReplySeverity
 import io.github.youndie.smtp.transport.SmtpTransport
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
-/** What is being sent, as the envelope sees it. */
+/** What is being sent, as the envelope sees it — not to be confused with the message headers. */
 public data class Envelope(
     public val sender: Mailbox?,
     public val recipients: List<Mailbox>,
@@ -18,24 +27,50 @@ public data class RejectedRecipient(
     public val reply: SmtpReply,
 )
 
-/** The outcome of one transaction. */
+/**
+ * The outcome of one transaction.
+ *
+ * A partial refusal is data, not an exception: collapsing it into a throw would lose the knowledge
+ * of who *did* get the message, and that knowledge is the only thing standing between a retry and
+ * a duplicate.
+ *
+ * [acceptance] is `null` when no recipient was accepted, so the message was never sent.
+ */
 public data class DeliveryResult(
     public val accepted: List<Mailbox>,
     public val rejected: List<RejectedRecipient>,
     public val acceptance: SmtpReply?,
 )
 
-/** How long the client waits, per `docs/rfc/rfc5321.txt:3610`. */
+/**
+ * How long the client waits.
+ *
+ * The defaults are the minimums from `docs/rfc/rfc5321.txt:3610`: waiting less than this violates
+ * the specification, so shortening them is the caller's decision to make knowingly.
+ */
 public data class SmtpTimeouts(
-    public val greeting: Duration = Duration.ZERO,
-    public val mailCommand: Duration = Duration.ZERO,
-    public val recipientCommand: Duration = Duration.ZERO,
-    public val dataInitiation: Duration = Duration.ZERO,
-    public val dataBlock: Duration = Duration.ZERO,
-    public val dataTermination: Duration = Duration.ZERO,
+    /** `docs/rfc/rfc5321.txt:3623` */
+    public val greeting: Duration = 5.minutes,
+    /** `docs/rfc/rfc5321.txt:3631` */
+    public val mailCommand: Duration = 5.minutes,
+    /** `docs/rfc/rfc5321.txt:3633` */
+    public val recipientCommand: Duration = 5.minutes,
+    /** `docs/rfc/rfc5321.txt:3647` */
+    public val dataInitiation: Duration = 2.minutes,
+    /** `docs/rfc/rfc5321.txt:3651` */
+    public val dataBlock: Duration = 3.minutes,
+    /** `docs/rfc/rfc5321.txt:3656` */
+    public val dataTermination: Duration = 10.minutes,
+    /**
+     * Everything the RFC gives no number for: `EHLO`, `HELO`, `RSET`, `QUIT`, `STARTTLS`.
+     *
+     * Chosen here, not quoted — five minutes matches the neighbouring commands.
+     */
+    public val otherCommands: Duration = 5.minutes,
 )
 
 public data class SmtpClientConfig(
+    /** What goes into `EHLO`; the server may check it against the connecting address. */
     public val clientIdentity: String,
     public val timeouts: SmtpTimeouts = SmtpTimeouts(),
 )
@@ -46,22 +81,192 @@ public class SmtpTimeoutException(
     public val limit: Duration,
 ) : RuntimeException("Timed out after $limit waiting for $what")
 
-public class SmtpSession internal constructor() {
-    public val capabilities: Capabilities get() = TODO("M-20")
+/**
+ * One SMTP conversation over one connection.
+ *
+ * Owns the phase the session is in: the greeting, the announced extensions, and the fact that
+ * `STARTTLS` invalidates them (`docs/rfc/rfc3207.txt:210`). Knows nothing about sockets or TLS —
+ * both arrive through [SmtpTransport] and through the lambda handed to [startTls].
+ *
+ * Not thread-safe, and not meant to be: one connection, one session, one coroutine.
+ */
+public class SmtpSession internal constructor(
+    private val transport: SmtpTransport,
+    private val config: SmtpClientConfig,
+) {
+    private val reader = SmtpReplyReader()
+    private lateinit var announced: Capabilities
 
+    /**
+     * What the server announced in the current phase.
+     *
+     * Always current: after `STARTTLS` this is a different value, and the previous one starts
+     * throwing (see `Capabilities.markStale`).
+     */
+    public val capabilities: Capabilities get() = announced
+
+    /**
+     * Runs one transaction: `MAIL FROM`, a `RCPT TO` per recipient, then `DATA` and the body.
+     *
+     * Throws [SmtpRefusedException] when the server refuses the transaction as a whole; a refusal
+     * of individual recipients comes back inside [DeliveryResult].
+     */
     public suspend fun send(
         envelope: Envelope,
         body: List<String>,
-    ): DeliveryResult = TODO("M-25")
+    ): DeliveryResult {
+        val mail = exchange(SmtpCommand.MailFrom(envelope.sender), "MAIL FROM", config.timeouts.mailCommand)
+        if (!mail.isPositiveCompletion) throw SmtpRefusedException("MAIL FROM", mail)
 
-    public suspend fun reset(): Unit = TODO("M-27")
+        val accepted = mutableListOf<Mailbox>()
+        val rejected = mutableListOf<RejectedRecipient>()
 
-    public suspend fun quit(): Unit = TODO("M-20")
+        for (recipient in envelope.recipients) {
+            val reply = exchange(SmtpCommand.RcptTo(recipient), "RCPT TO", config.timeouts.recipientCommand)
+            // 250 and 251 both mean accepted (`docs/rfc/rfc5321.txt:2642`).
+            if (reply.isPositiveCompletion) accepted += recipient else rejected += RejectedRecipient(recipient, reply)
+        }
 
-    public suspend fun startTls(upgrade: suspend () -> Unit): Unit = TODO("M-21")
+        if (accepted.isEmpty()) {
+            // Nobody left to send to. RSET rather than DATA, so the connection stays usable for
+            // the next message instead of being torn down.
+            reset()
+            return DeliveryResult(accepted = emptyList(), rejected = rejected, acceptance = null)
+        }
+
+        val data = exchange(SmtpCommand.Data, "DATA", config.timeouts.dataInitiation)
+        if (data.code.severity != SmtpReplySeverity.POSITIVE_INTERMEDIATE) {
+            throw SmtpRefusedException("DATA", data)
+        }
+
+        write(MailData.encode(body), "sending the message body", config.timeouts.dataBlock)
+        val acceptance = readReply("the reply to the end of the message", config.timeouts.dataTermination)
+        if (!acceptance.isPositiveCompletion) throw SmtpRefusedException("end of DATA", acceptance)
+
+        return DeliveryResult(accepted = accepted, rejected = rejected, acceptance = acceptance)
+    }
+
+    /** `RSET` — drops the current transaction, keeps the session and any authentication. */
+    public suspend fun reset() {
+        val reply = exchange(SmtpCommand.Rset, "RSET", config.timeouts.otherCommands)
+        if (!reply.isPositiveCompletion) throw SmtpRefusedException("RSET", reply)
+    }
+
+    /**
+     * `QUIT` and close.
+     *
+     * A rude answer is not turned into an exception: the session is over either way, and failing
+     * here would only mask whatever the caller was really doing.
+     */
+    public suspend fun quit() {
+        exchange(SmtpCommand.Quit, "QUIT", config.timeouts.otherCommands)
+        transport.close()
+    }
+
+    /**
+     * `STARTTLS` — `docs/rfc/rfc3207.txt`.
+     *
+     * [upgrade] performs the handshake over the same connection; the session does not know how,
+     * and that is the seam the TLS module plugs into on M4.
+     *
+     * Afterwards everything learned before the handshake is discarded and `EHLO` is sent again,
+     * because `docs/rfc/rfc3207.txt:210` requires exactly that — a client that keeps the old
+     * extension list can be talked into a downgrade by an active attacker.
+     */
+    public suspend fun startTls(upgrade: suspend () -> Unit) {
+        val reply = exchange(SmtpCommand.StartTls, "STARTTLS", config.timeouts.otherCommands)
+        if (!reply.isPositiveCompletion) throw SmtpRefusedException("STARTTLS", reply)
+
+        upgrade()
+
+        if (!reader.isIdle) {
+            throw SmtpProtocolException("The server sent data before the TLS handshake was finished")
+        }
+
+        announced.markStale()
+        identify()
+    }
+
+    internal suspend fun handshake() {
+        val greeting = readReply("the server greeting", config.timeouts.greeting)
+        if (!greeting.isPositiveCompletion) throw SmtpRefusedException("greeting", greeting)
+        identify()
+    }
+
+    /**
+     * `EHLO`, falling back to `HELO`.
+     *
+     * A server that predates ESMTP answers 500 or 502; that is not a failure, only an older
+     * server, and `HELO` announces no extensions at all.
+     */
+    private suspend fun identify() {
+        val ehlo = exchange(SmtpCommand.Ehlo(config.clientIdentity), "EHLO", config.timeouts.otherCommands)
+        if (ehlo.isPositiveCompletion) {
+            announced = Capabilities.parse(ehlo)
+            return
+        }
+
+        val helo = exchange(SmtpCommand.Helo(config.clientIdentity), "HELO", config.timeouts.otherCommands)
+        if (!helo.isPositiveCompletion) throw SmtpRefusedException("HELO", helo)
+        announced = Capabilities.parse(helo)
+    }
+
+    private suspend fun exchange(
+        command: SmtpCommand,
+        name: String,
+        limit: Duration,
+    ): SmtpReply {
+        write(command.encode(), "sending $name", limit)
+        return readReply("the reply to $name", limit)
+    }
+
+    private suspend fun write(
+        data: String,
+        what: String,
+        limit: Duration,
+    ) {
+        withLimit(what, limit) { transport.write(data) }
+    }
+
+    /**
+     * Reads lines until the reader says the reply is complete.
+     *
+     * The reader is asked, rather than the line inspected here, because a multiline reply ends on
+     * a line the session has no business parsing (`docs/rfc/rfc2920.txt:193`).
+     */
+    private suspend fun readReply(
+        what: String,
+        limit: Duration,
+    ): SmtpReply =
+        withLimit(what, limit) {
+            var reply: SmtpReply? = null
+            while (reply == null) {
+                reply = reader.feed(transport.readLine())
+            }
+            reply
+        }
+
+    private suspend fun <T> withLimit(
+        what: String,
+        limit: Duration,
+        block: suspend () -> T,
+    ): T =
+        try {
+            withTimeout(limit) { block() }
+        } catch (_: TimeoutCancellationException) {
+            // The cause is dropped on purpose: it says nothing beyond "it timed out", and keeping
+            // it would drag a coroutines type into what the caller sees.
+            throw SmtpTimeoutException(what, limit)
+        }
 }
 
+/**
+ * Opens a session over an already connected [transport]: reads the greeting and identifies the
+ * client.
+ *
+ * Connecting is not this function's business — that is what the transport module is for.
+ */
 public suspend fun openSmtpSession(
     transport: SmtpTransport,
     config: SmtpClientConfig,
-): SmtpSession = TODO("M-20")
+): SmtpSession = SmtpSession(transport, config).apply { handshake() }

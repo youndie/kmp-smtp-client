@@ -122,8 +122,19 @@ class SmtpSessionTest {
 
             assertEquals(listOf(Mailbox.parse("good@example.com")), result.accepted)
             assertEquals(1, result.rejected.size)
-            assertEquals(550, result.rejected.single().reply.code.value)
-            assertEquals("5.1.1", result.rejected.single().reply.enhancedStatus.toString())
+            assertEquals(
+                550,
+                result.rejected
+                    .single()
+                    .reply.code.value,
+            )
+            assertEquals(
+                "5.1.1",
+                result.rejected
+                    .single()
+                    .reply.enhancedStatus
+                    .toString(),
+            )
             transport.assertScriptCompleted()
         }
 
