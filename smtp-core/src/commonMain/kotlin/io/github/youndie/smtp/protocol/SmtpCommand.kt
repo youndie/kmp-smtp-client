@@ -13,23 +13,39 @@ public sealed class SmtpCommand {
     public abstract val line: String
 
     /** Помещается ли команда в предел строки — `docs/rfc/rfc5321.txt:3498`. */
-    public val fitsLineLimit: Boolean get() = TODO("M-14")
+    public val fitsLineLimit: Boolean
+        get() = line.encodeToByteArray().size <= MAX_LINE_OCTETS_WITHOUT_CRLF
 
     /** Строка вместе с `CRLF` — то, что уходит в сокет. */
-    public fun encode(): String = TODO("M-14")
+    public fun encode(): String {
+        line.forEach { character ->
+            if (character == '\r' || character == '\n') {
+                throw SmtpProtocolException("Перевод строки внутри команды: '$line'")
+            }
+        }
+
+        if (!fitsLineLimit) {
+            throw SmtpProtocolException(
+                "Командная строка длиннее $MAX_LINE_OCTETS_WITHOUT_CRLF октетов без CRLF: " +
+                    "${line.encodeToByteArray().size}",
+            )
+        }
+
+        return line + CRLF
+    }
 
     /** `EHLO` — `docs/rfc/rfc5321.txt:1836`. */
     public data class Ehlo(
         public val clientIdentity: String,
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "EHLO $clientIdentity"
     }
 
     /** `HELO` — только как откат для серверов без ESMTP. */
     public data class Helo(
         public val clientIdentity: String,
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "HELO $clientIdentity"
     }
 
     /**
@@ -42,7 +58,8 @@ public sealed class SmtpCommand {
         public val sender: Mailbox?,
         public val parameters: List<String> = emptyList(),
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String
+            get() = "MAIL FROM:${sender?.path ?: "<>"}".withParameters(parameters)
     }
 
     /** `RCPT TO:` — `docs/rfc/rfc5321.txt:1913`, по одной команде на получателя. */
@@ -50,34 +67,34 @@ public sealed class SmtpCommand {
         public val recipient: Mailbox,
         public val parameters: List<String> = emptyList(),
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "RCPT TO:${recipient.path}".withParameters(parameters)
     }
 
     /** `DATA` — `docs/rfc/rfc5321.txt:1992`. */
     public data object Data : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "DATA"
     }
 
     /** `RSET` — сбрасывает транзакцию, не трогая аутентификацию. */
     public data object Rset : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "RSET"
     }
 
     /** `QUIT`. */
     public data object Quit : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "QUIT"
     }
 
     /** `STARTTLS` — `docs/rfc/rfc3207.txt`. */
     public data object StartTls : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = "STARTTLS"
     }
 
     /** `NOOP` — при PIPELINING служит точкой синхронизации (`docs/rfc/rfc2920.txt:137`). */
     public data class Noop(
         public val text: String? = null,
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String get() = if (text == null) "NOOP" else "NOOP $text"
     }
 
     /** `AUTH` — `docs/rfc/rfc4954.txt:699`. */
@@ -85,7 +102,8 @@ public sealed class SmtpCommand {
         public val mechanism: String,
         public val initialResponse: String? = null,
     ) : SmtpCommand() {
-        override val line: String get() = TODO("M-14")
+        override val line: String
+            get() = if (initialResponse == null) "AUTH $mechanism" else "AUTH $mechanism $initialResponse"
     }
 
     public companion object {
