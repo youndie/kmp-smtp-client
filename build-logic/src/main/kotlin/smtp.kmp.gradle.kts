@@ -23,6 +23,18 @@ kotlin {
     // See docs/research/research-architecture.md, D9.
     macosArm64()
 
+    // Server platforms next in line. They compile in every gate; their tests run only on a
+    // matching host, which nobody here has — see the module documents for what that means.
+    linuxArm64()
+    macosX64()
+    mingwX64()
+
+    // Apple mobile, compile only. The protocol layer is pure Kotlin and works there, but there is
+    // no TLS provider for it yet (M-83), and the simulator targets are left out on purpose: their
+    // test tasks need an iOS SDK that is not installed here, and a test task that cannot run is
+    // worse than an absent target — it looks like coverage.
+    iosArm64()
+
     compilerOptions {
         allWarningsAsErrors.set(true)
     }
