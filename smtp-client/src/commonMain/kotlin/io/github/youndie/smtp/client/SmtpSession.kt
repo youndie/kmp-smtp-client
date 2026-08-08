@@ -124,6 +124,12 @@ public class SmtpSession internal constructor(
     public suspend fun send(
         envelope: Envelope,
         body: List<String>,
+        options: SendOptions = SendOptions(),
+    ): DeliveryResult = TODO("M-62")
+
+    private suspend fun sendInternal(
+        envelope: Envelope,
+        body: List<String>,
     ): DeliveryResult {
         val mail = exchange(SmtpCommand.MailFrom(envelope.sender), "MAIL FROM", config.timeouts.mailCommand)
         if (!mail.isPositiveCompletion) throw SmtpRefusedException("MAIL FROM", mail)
