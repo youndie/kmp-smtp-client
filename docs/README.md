@@ -36,6 +36,7 @@
 - [services/smtp-tls-openssl.md](services/smtp-tls-openssl.md) — TLS: memory BIO, проверка
   сертификата, грабли cinterop.
 - [services/smtp-sasl.md](services/smtp-sasl.md) — механизмы SASL и их векторы.
+- [services/smtp-tls-jvm.md](services/smtp-tls-jvm.md) — TLS на JVM.
 - [services/smtp-transport-ktor.md](services/smtp-transport-ktor.md) — TCP-транспорт и как гонять
   E2E против сервера из `docker-compose.yml`.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
@@ -54,12 +55,13 @@
 - [ ] `feature-tls` — M4
 - [x] [feature-authentication](features/feature-authentication.md) — семь механизмов SASL
 
-### Modules (6/7)
+### Modules (7/8)
 - [x] [smtp-core](services/smtp-core.md) — протокол и домен, без I/O
 - [x] [smtp-client](services/smtp-client.md) — сессия и транзакции
 - [x] [smtp-transport-ktor](services/smtp-transport-ktor.md) — TCP поверх ktor-network
 - [x] [smtp-testing](services/smtp-testing.md) — сценарный транспорт
 - [x] [smtp-tls-openssl](services/smtp-tls-openssl.md) — TLS через OpenSSL, только нативные таргеты
+- [x] [smtp-tls-jvm](services/smtp-tls-jvm.md) — TLS через SSLEngine
 - [x] [smtp-sasl](services/smtp-sasl.md) — механизмы аутентификации
 - [ ] `smtp-mime` — M9
 

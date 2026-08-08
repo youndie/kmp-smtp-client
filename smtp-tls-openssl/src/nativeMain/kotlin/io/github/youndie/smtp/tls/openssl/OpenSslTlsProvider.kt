@@ -18,6 +18,7 @@ import openssl.BIO_new
 import openssl.BIO_read
 import openssl.BIO_s_mem
 import openssl.BIO_write
+import openssl.ERR_clear_error
 import openssl.ERR_error_string_n
 import openssl.ERR_get_error
 import openssl.OPENSSL_init_ssl
@@ -221,6 +222,11 @@ internal class OpenSslConnection(
 
     suspend fun handshake() {
         while (true) {
+            // The error queue is per thread and survives across calls. Without clearing it first,
+            // a failure reported here can be somebody else's, from an operation that already
+            // returned — which is exactly how a working connection gets blamed for a certificate
+            // that was rejected in a previous test.
+            ERR_clear_error()
             val result = SSL_connect(ssl)
             if (result == 1) {
                 drainOutgoing()
@@ -247,6 +253,7 @@ internal class OpenSslConnection(
 
     override suspend fun read(destination: ByteArray): Int {
         while (true) {
+            ERR_clear_error()
             val read = destination.usePinned { SSL_read(ssl, it.addressOf(0), destination.size) }
             if (read > 0) return read
 
@@ -277,6 +284,7 @@ internal class OpenSslConnection(
     ) {
         var sent = 0
         while (sent < length) {
+            ERR_clear_error()
             val written = source.usePinned { SSL_write(ssl, it.addressOf(sent), length - sent) }
             if (written > 0) {
                 sent += written
