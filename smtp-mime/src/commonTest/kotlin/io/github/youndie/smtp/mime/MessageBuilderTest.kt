@@ -2,11 +2,11 @@ package io.github.youndie.smtp.mime
 
 import io.github.youndie.smtp.protocol.Mailbox
 import io.github.youndie.smtp.protocol.SmtpProtocolException
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 /**
  * Building a message — `docs/rfc/rfc5322.txt` and the MIME set (`docs/rfc/rfc2045.txt` onwards).
@@ -33,7 +33,7 @@ class MessageBuilderTest {
         // rfc5322.txt section 3.3: day-of-week ", " day month year time zone.
         val lines = build { text = "hello" }
 
-        assertEquals("Date: Sat, 8 Aug 2026 21:04:05 +0000", lines.single { it.startsWith("Date: ") })
+        assertEquals("Date: Mon, 10 Aug 2026 03:04:05 +0000", lines.single { it.startsWith("Date: ") })
     }
 
     @Test
@@ -60,7 +60,10 @@ class MessageBuilderTest {
 
         assertEquals(2, lines.count { it == "--$boundary" })
         assertTrue(lines.contains("--$boundary--"), "the closing delimiter has two trailing dashes")
-        assertTrue(lines.indexOf("Content-Type: text/plain; charset=utf-8") < lines.indexOf("Content-Type: text/html; charset=utf-8"))
+        assertTrue(
+            lines.indexOf("Content-Type: text/plain; charset=utf-8") <
+                lines.indexOf("Content-Type: text/html; charset=utf-8"),
+        )
     }
 
     @Test
@@ -103,7 +106,11 @@ class MessageBuilderTest {
     @Test
     fun `a non-ASCII subject is written as an encoded word`() {
         // rfc2047.txt: a header value is ASCII, so anything else is encoded in place.
-        val lines = build { subject = "Привет"; text = "hello" }
+        val lines =
+            build {
+                subject = "Привет"
+                text = "hello"
+            }
 
         val header = lines.single { it.startsWith("Subject: ") }
         assertTrue(header.startsWith("Subject: =?utf-8?B?"), header)
@@ -112,7 +119,11 @@ class MessageBuilderTest {
 
     @Test
     fun `an ASCII subject is left alone`() {
-        val lines = build { subject = "Plain subject"; text = "hello" }
+        val lines =
+            build {
+                subject = "Plain subject"
+                text = "hello"
+            }
 
         assertEquals("Subject: Plain subject", lines.single { it.startsWith("Subject: ") })
     }
@@ -121,7 +132,11 @@ class MessageBuilderTest {
     fun `a long header is folded`() {
         // rfc5322.txt section 2.2.3: long header fields are split on white space, and the
         // continuation lines start with white space.
-        val lines = build { subject = (1..20).joinToString(" ") { "word$it" }; text = "hello" }
+        val lines =
+            build {
+                subject = (1..20).joinToString(" ") { "word$it" }
+                text = "hello"
+            }
 
         val start = lines.indexOfFirst { it.startsWith("Subject: ") }
         assertTrue(lines[start].length <= 78, "header line was ${lines[start].length}")
@@ -133,7 +148,10 @@ class MessageBuilderTest {
         // Without this a subject is a way to add headers of somebody else's choosing — or to end
         // the message early.
         assertFailsWith<SmtpProtocolException> {
-            build { subject = "Hi\r\nBcc: evil@example.com"; text = "hello" }
+            build {
+                subject = "Hi\r\nBcc: evil@example.com"
+                text = "hello"
+            }
         }
     }
 
@@ -161,7 +179,7 @@ class MessageBuilderTest {
         )
 
     private companion object {
-        /** 2026-08-08T21:04:05Z — fixed so that the date test can compare a whole line. */
+        /** 2026-08-10T03:04:05Z — fixed so that the date test can compare a whole line. */
         const val FIXED_TIME = 1786331045L
     }
 }

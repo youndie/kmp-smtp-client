@@ -4,7 +4,6 @@ build/
 !src/**/build/
 local.properties
 .kotlin/
-kotlin-js-store/
 
 .idea/
 *.iml
