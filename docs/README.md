@@ -27,14 +27,16 @@
   Проверенные факты о Ktor и Kotlin/Native, принятые решения, риски, открытые вопросы.
 - [api/protocol-smtp.md](api/protocol-smtp.md) — контракт SMTP на проводе с ссылками на строки RFC.
   По нему пишутся тесты.
+- [features/feature-send-message.md](features/feature-send-message.md) — что библиотека даёт
+  пользователю, со сценариями приёмки.
 - [services/smtp-core.md](services/smtp-core.md) — модуль ядра: зона ответственности, якоря кода,
   грабли.
+- [services/smtp-client.md](services/smtp-client.md) — сессия, транзакции, таймауты.
+- [services/smtp-testing.md](services/smtp-testing.md) — сценарный транспорт для тестов.
 - [services/smtp-transport-ktor.md](services/smtp-transport-ktor.md) — TCP-транспорт и как гонять
   E2E против сервера из `docker-compose.yml`.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M10 и задачи `M-NN`.
-
-`features/` пока пуст: фичу описывать нечем, пока нет сессии. Первая появится на M2.
 
 ## Карта покрытия
 
@@ -44,16 +46,16 @@
 ### Protocol (1/1)
 - [x] [protocol-smtp](api/protocol-smtp.md) — разделы 1–2, 4–5, 8 реализованы в `smtp-core`
 
-### Features (0)
-- [ ] `feature-send-message` — появится на M2
-- [ ] `feature-authentication` — M5
+### Features (1)
+- [x] [feature-send-message](features/feature-send-message.md) — отправка через сабмишн-релей
 - [ ] `feature-tls` — M4
+- [ ] `feature-authentication` — M5
 
-### Modules (2/7)
+### Modules (4/7)
 - [x] [smtp-core](services/smtp-core.md) — протокол и домен, без I/O
+- [x] [smtp-client](services/smtp-client.md) — сессия и транзакции
 - [x] [smtp-transport-ktor](services/smtp-transport-ktor.md) — TCP поверх ktor-network
-- [ ] `smtp-client` — M2
-- [ ] `smtp-testing` — M3
+- [x] [smtp-testing](services/smtp-testing.md) — сценарный транспорт
 - [ ] `smtp-tls-openssl` — M4
 - [ ] `smtp-sasl` — M5
 - [ ] `smtp-mime` — M9

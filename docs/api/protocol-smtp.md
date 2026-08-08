@@ -4,7 +4,7 @@ title: SMTP на проводе — контракт, по которому пи
 type: protocol
 status: active
 source_of_truth: docs/rfc/
-implemented_by: [smtp-core]
+implemented_by: [smtp-core, smtp-client]
 ---
 
 # SMTP на проводе
@@ -13,8 +13,9 @@ implemented_by: [smtp-core]
 существует затем, чтобы тест можно было написать **до** реализации, и чтобы в тесте стояла ссылка
 на строку RFC, а не «ну так принято».
 
-Что из описанного уже реализовано, живёт в [`smtp-core`](../services/smtp-core.md): разделы 1, 2,
-4 (сериализация), 5 и 8 (пределы) закрыты вехой M1; фазы сессии (раздел 3), PIPELINING (7) и
+Что из описанного уже реализовано: разделы 1, 2, 4, 5 и 8 — в
+[`smtp-core`](../services/smtp-core.md) (веха M1); раздел 3 (фазы сессии) и раздел 10
+(классификация ошибок) — в [`smtp-client`](../services/smtp-client.md) (веха M2). PIPELINING (7) и
 обмен AUTH (9) — ещё нет.
 
 Ссылки вида `rfc5321.txt:3498` указывают на строку в копии из `docs/rfc/`.

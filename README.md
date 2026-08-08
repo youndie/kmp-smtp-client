@@ -8,9 +8,10 @@ Kotlin/Native**, не таща за собой JVM.
 закрывает пробел: чистая реализация RFC 5321 поверх сокетов, с STARTTLS, AUTH и разбором
 расширений ESMTP.
 
-> **Статус: M1 закрыта, M3 наполовину.** Ядро протокола покрыто 68 тестами, есть TCP-транспорт
-> и сквозной тест против настоящего SMTP-сервера в контейнере: письмо уходит и принимается.
-> Удобного API для отправки ещё нет — сессия делается на M2, TLS на M4, AUTH на M5.
+> **Статус: M2 закрыта.** Письмо уходит: сессия, транзакции, таймауты и внятный результат
+> «кому доставлено, кому отказано, стоит ли повторять». 93 теста, включая сквозной против
+> настоящего SMTP-сервера в контейнере. По открытому каналу и без аутентификации — TLS на M4,
+> `AUTH` на M5.
 
 ## Что планируется
 
@@ -33,6 +34,23 @@ Kotlin/Native**, не таща за собой JVM.
 Ktor используется только как транспорт TCP (`ktor-network`) и заперт в одном модуле-адаптере.
 TLS свой: на Kotlin/Native `ktor-network-tls` не работает вовсе — почему и что с этим делать,
 разобрано в ресёрче.
+
+```kotlin
+val transport = KtorTcpTransport.connect("smtp.example.com", 587)
+val session = openSmtpSession(transport, SmtpClientConfig(clientIdentity = "my-service.example.com"))
+
+val result = session.send(
+    envelope = Envelope(
+        sender = Mailbox.parse("noreply@example.com"),
+        recipients = listOf(Mailbox.parse("user@example.com")),
+    ),
+    body = listOf("Subject: hello", "", "text"),
+)
+
+println(result.accepted)   // кому доставлено
+println(result.rejected)   // кому отказано и с каким кодом
+session.quit()
+```
 
 ## Документация
 
