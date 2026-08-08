@@ -9,12 +9,15 @@ import io.github.youndie.smtp.protocol.SmtpRefusedException
 import io.github.youndie.smtp.protocol.SmtpReply
 import io.github.youndie.smtp.protocol.SmtpReplyReader
 import io.github.youndie.smtp.protocol.SmtpReplySeverity
+import io.github.youndie.smtp.sasl.SaslException
+import io.github.youndie.smtp.sasl.SaslMechanism
 import io.github.youndie.smtp.transport.LineFramedTransport
 import io.github.youndie.smtp.transport.SmtpTransport
 import io.github.youndie.smtp.transport.TlsConfig
 import io.github.youndie.smtp.transport.TlsProvider
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -99,6 +102,10 @@ public class SmtpSession internal constructor(
 ) {
     private val reader = SmtpReplyReader()
     private lateinit var announced: Capabilities
+    private var encrypted = false
+
+    /** Whether the conversation is running inside TLS. */
+    public val isEncrypted: Boolean get() = encrypted
 
     /**
      * What the server announced in the current phase.
@@ -210,6 +217,32 @@ public class SmtpSession internal constructor(
         startTls { framed.upgrade { connection -> provider.handshake(connection, config) } }
     }
 
+    /**
+     * `AUTH` — `docs/rfc/rfc4954.txt`.
+     *
+     * Refuses to run over a cleartext connection unless [allowOverPlaintext] says otherwise:
+     * credentials sent in the clear are credentials given away, and `docs/rfc/rfc8314.txt` calls
+     * cleartext submission obsolete. The flag exists for test servers and for tunnels the library
+     * cannot see.
+     *
+     * On success everything learned before authentication is discarded and `EHLO` is sent again,
+     * exactly as after `STARTTLS`: `docs/rfc/rfc4954.txt:297` requires it, and a client that keeps
+     * the old list can be walked into a downgrade.
+     */
+    public suspend fun authenticate(
+        mechanism: SaslMechanism,
+        allowOverPlaintext: Boolean = false,
+    ): Unit = TODO("M-51")
+
+    /**
+     * Sends `AUTH`, using the initial response only when it fits.
+     *
+     * `docs/rfc/rfc4954.txt:208`: if the initial response would push the command past the line
+     * limit, the client **must not** use that parameter and has to send the same bytes as an
+     * ordinary response instead. OAuth tokens hit this routinely.
+     */
+    private val authTimeout get() = config.timeouts.otherCommands
+
     internal suspend fun handshake() {
         val greeting = readReply("the server greeting", config.timeouts.greeting)
         if (!greeting.isPositiveCompletion) throw SmtpRefusedException("greeting", greeting)
@@ -268,6 +301,16 @@ public class SmtpSession internal constructor(
             }
             reply
         }
+
+    private companion object {
+        /** An empty client-first message is written as `=` — `docs/rfc/rfc4954.txt:735`. */
+        const val EMPTY_INITIAL_RESPONSE = "="
+
+        /** A single `*` cancels the exchange — `docs/rfc/rfc4954.txt:737`. */
+        const val SASL_CANCEL = "*"
+
+        const val CRLF = "\r\n"
+    }
 
     private suspend fun <T> withLimit(
         what: String,
