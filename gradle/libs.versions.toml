@@ -1,0 +1,27 @@
+[versions]
+kotlin = "2.4.10"
+kotlinxCoroutines = "1.11.0"
+ktor = "3.5.2"
+kotlincrypto = "0.8.0"
+# Версия зафиксирована намеренно: ktlint подключён как CLI, без плагина-обёртки.
+# См. docs/research/research-architecture.md, Р10.
+ktlint = "1.8.0"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+# Транспорт TCP. Живёт только в :smtp-transport-ktor (M3).
+# ktor-network-tls не подключается никогда: на Kotlin/Native это заглушка, см. research 1.1.
+ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
+
+# Криптография для SASL (M5), чистый Kotlin без cinterop.
+kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
+kotlincrypto-hmac-md = { module = "org.kotlincrypto.macs:hmac-md", version.ref = "kotlincrypto" }
+
+ktlint-cli = { module = "com.pinterest.ktlint:ktlint-cli", version.ref = "ktlint" }
+
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+[plugins]
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
