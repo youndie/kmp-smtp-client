@@ -34,7 +34,12 @@ class MechanismsTest {
     @Test
     fun `PLAIN refuses a NUL inside a credential`() {
         // The separator is NUL, so a NUL in the value would silently move the field boundaries.
-        assertFailsWith<SaslException> { PlainMechanism(username = "te\u0000st", password = "secret").initialResponse() }
+        assertFailsWith<SaslException> {
+            PlainMechanism(
+                username = "te\u0000st",
+                password = "secret",
+            ).initialResponse()
+        }
     }
 
     @Test
@@ -203,7 +208,10 @@ class MechanismsTest {
             )
         mechanism.initialResponse()
 
-        assertContentEquals("\u0001".encodeToByteArray(), mechanism.respond("""{"status":"invalid_token"}""".encodeToByteArray()))
+        assertContentEquals(
+            "\u0001".encodeToByteArray(),
+            mechanism.respond("""{"status":"invalid_token"}""".encodeToByteArray()),
+        )
     }
 
     private fun scramForTest() =
