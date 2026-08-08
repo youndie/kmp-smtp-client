@@ -4,14 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
 }
 
-/**
- * A module that binds to a C library through cinterop.
- *
- * Only the host target is declared, and that is not a shortcut: cinterop needs the **target**
- * platform's headers, so cross-compiling such a module from macOS to Linux does not work at all.
- * The consequence for releases is that linuxX64 artifacts of this module have to be published from
- * a Linux runner (M-100).
- */
+// A module that binds to a C library through cinterop.
+//
+// Only the host target is declared, and that is not a shortcut: cinterop needs the *target*
+// platform's headers, so cross-compiling such a module from macOS to Linux does not work at all.
+// The consequence for releases is that linuxX64 artifacts of this module have to be published
+// from a Linux runner (M-100).
 kotlin {
     explicitApi()
 
