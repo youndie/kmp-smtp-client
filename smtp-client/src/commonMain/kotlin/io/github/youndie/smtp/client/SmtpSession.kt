@@ -9,7 +9,10 @@ import io.github.youndie.smtp.protocol.SmtpRefusedException
 import io.github.youndie.smtp.protocol.SmtpReply
 import io.github.youndie.smtp.protocol.SmtpReplyReader
 import io.github.youndie.smtp.protocol.SmtpReplySeverity
+import io.github.youndie.smtp.transport.LineFramedTransport
 import io.github.youndie.smtp.transport.SmtpTransport
+import io.github.youndie.smtp.transport.TlsConfig
+import io.github.youndie.smtp.transport.TlsProvider
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
@@ -185,6 +188,26 @@ public class SmtpSession internal constructor(
 
         announced.markStale()
         identify()
+    }
+
+    /**
+     * `STARTTLS` with a provider doing the handshake.
+     *
+     * Needs a transport whose byte layer can be swapped — that is what [LineFramedTransport] is
+     * for. A scripted or already encrypted transport cannot do it, and saying so out loud beats
+     * pretending the upgrade happened.
+     */
+    public suspend fun startTls(
+        provider: TlsProvider,
+        config: TlsConfig,
+    ) {
+        val framed =
+            transport as? LineFramedTransport
+                ?: throw SmtpProtocolException(
+                    "STARTTLS needs a transport that can swap its byte layer, got ${transport::class.simpleName}",
+                )
+
+        startTls { framed.upgrade { connection -> provider.handshake(connection, config) } }
     }
 
     internal suspend fun handshake() {

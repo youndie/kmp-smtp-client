@@ -5,6 +5,9 @@ import io.github.youndie.smtp.protocol.SmtpProtocolException
 import io.github.youndie.smtp.protocol.SmtpRefusedException
 import io.github.youndie.smtp.testing.ScriptedTransport
 import io.github.youndie.smtp.testing.scriptedTransport
+import io.github.youndie.smtp.transport.ByteConnection
+import io.github.youndie.smtp.transport.TlsConfig
+import io.github.youndie.smtp.transport.TlsProvider
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -305,6 +308,34 @@ class SmtpSessionTest {
             assertFailsWith<SmtpProtocolException> { beforeHandshake.supportsStartTls }
 
             transport.assertScriptCompleted()
+        }
+
+    @Test
+    fun `STARTTLS over a transport that cannot swap its byte layer is refused`() =
+        runTest {
+            // A scripted transport has no byte layer to replace. Failing here beats pretending the
+            // upgrade happened and continuing in the clear.
+            val transport =
+                scriptedTransport {
+                    greeting()
+                    clientWrites("STARTTLS\r\n")
+                    serverSays("220 Ready to start TLS")
+                }
+
+            val session = openSession(transport)
+
+            assertFailsWith<SmtpProtocolException> {
+                session.startTls(
+                    provider =
+                        object : TlsProvider {
+                            override suspend fun handshake(
+                                connection: ByteConnection,
+                                config: TlsConfig,
+                            ): ByteConnection = error("never reached")
+                        },
+                    config = TlsConfig(serverName = "smtp.example.com"),
+                )
+            }
         }
 
     private fun envelope(vararg recipients: String) =

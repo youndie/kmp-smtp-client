@@ -77,6 +77,7 @@ kotlin {
             // Test-only: the TLS tests need a real socket underneath, and that is the transport
             // module's job. Production code here never depends on it.
             implementation(projects.smtpTransportKtor)
+            implementation(projects.smtpClient)
         }
     }
 }
