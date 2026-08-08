@@ -8,10 +8,10 @@ Kotlin/Native**, не таща за собой JVM.
 закрывает пробел: чистая реализация RFC 5321 поверх сокетов, с STARTTLS, AUTH и разбором
 расширений ESMTP.
 
-> **Статус: M2 закрыта.** Письмо уходит: сессия, транзакции, таймауты и внятный результат
-> «кому доставлено, кому отказано, стоит ли повторять». 93 теста, включая сквозной против
-> настоящего SMTP-сервера в контейнере. По открытому каналу и без аутентификации — TLS на M4,
-> `AUTH` на M5.
+> **Статус: функциональность закрыта, релиза ещё не было.** Вехи M0–M9 сделаны: протокол, сессия,
+> TLS, аутентификация, расширения ESMTP, построение письма. 173 теста на `linuxX64`, из них шесть
+> против настоящего TLS-сервера в контейнере. Публикация настроена, но не выполнена —
+> см. [RELEASING.md](RELEASING.md).
 
 ## Что планируется
 
@@ -35,8 +35,40 @@ Ktor используется только как транспорт TCP (`ktor-
 TLS свой: на Kotlin/Native `ktor-network-tls` не работает вовсе — почему и что с этим делать,
 разобрано в ресёрче.
 
+## Быстрый старт
+
 ```kotlin
-val transport = KtorTcpTransport.connect("smtp.example.com", 587)
+dependencies {
+    implementation("io.github.youndie:smtp-client:0.1.0")
+    implementation("io.github.youndie:smtp-transport-ktor:0.1.0")  // сокеты
+    implementation("io.github.youndie:smtp-tls-openssl:0.1.0")     // TLS на Kotlin/Native
+    implementation("io.github.youndie:smtp-tls-jvm:0.1.0")         // TLS на JVM
+    implementation("io.github.youndie:smtp-sasl:0.1.0")            // аутентификация
+    implementation("io.github.youndie:smtp-mime:0.1.0")            // построение письма
+}
+```
+
+Сабмишн через релей — порт 587, `STARTTLS`, `AUTH`:
+
+```kotlin
+val transport = connectSmtp("smtp.example.com", 587)
+val session = openSmtpSession(transport, SmtpClientConfig(clientIdentity = "my-service.example.com"))
+
+session.startTls(OpenSslTlsProvider, TlsConfig(serverName = "smtp.example.com"))
+session.authenticate(PlainMechanism(username = "user", password = "secret"))
+
+val result = session.send(envelope, body)
+session.quit()
+```
+
+Полный рабочий пример — [examples/send](examples/send/src/commonMain/kotlin/Main.kt); он
+компилируется каждой сборкой, поэтому не может протухнуть незаметно.
+
+<details>
+<summary>Без TLS, как это выглядит целиком</summary>
+
+```kotlin
+val transport = connectSmtp("smtp.example.com", 587)
 val session = openSmtpSession(transport, SmtpClientConfig(clientIdentity = "my-service.example.com"))
 
 val result = session.send(
@@ -51,6 +83,8 @@ println(result.accepted)   // кому доставлено
 println(result.rejected)   // кому отказано и с каким кодом
 session.quit()
 ```
+
+</details>
 
 ## Документация
 

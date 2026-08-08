@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    id("smtp.publish")
     id("org.jetbrains.kotlin.jvm")
 }
 

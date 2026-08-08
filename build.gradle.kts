@@ -2,6 +2,15 @@ plugins {
     base
 }
 
+// The coordinates every module publishes under. Confirmed in the research, section 3.
+group = "io.github.youndie"
+version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
+
+subprojects {
+    group = rootProject.group
+    version = rootProject.version
+}
+
 // ktlint is wired in as a CLI tool rather than through a wrapper plugin: this project wants
 // exactly version 1.8.0 and exactly its behaviour. Rationale — docs/research/research-architecture.md, D10.
 val ktlint: Configuration by configurations.creating

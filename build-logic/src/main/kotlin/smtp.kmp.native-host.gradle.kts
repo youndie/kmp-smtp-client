@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.konan.target.HostManager
 
 plugins {
+    id("smtp.publish")
     id("org.jetbrains.kotlin.multiplatform")
 }
 
