@@ -9,12 +9,12 @@ import kotlinx.cinterop.toKString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import platform.posix.getenv
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
-import platform.posix.getenv
 
 /**
  * TLS against a real server from `docker-compose.yml`.
@@ -39,7 +39,12 @@ class OpenSslTlsTest {
         withServer { host, port, ca ->
             val transport = connectSmtp(host, port)
             try {
-                transport.upgrade { OpenSslTlsProvider.handshake(it, TlsConfig(serverName = SERVER_NAME, caBundlePath = ca)) }
+                transport.upgrade {
+                    OpenSslTlsProvider.handshake(
+                        it,
+                        TlsConfig(serverName = SERVER_NAME, caBundlePath = ca),
+                    )
+                }
 
                 // The greeting only arrives once the handshake succeeded, so reading it proves the
                 // encrypted session actually carries data.

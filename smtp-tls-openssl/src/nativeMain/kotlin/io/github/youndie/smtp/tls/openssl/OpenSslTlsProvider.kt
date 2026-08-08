@@ -234,9 +234,13 @@ internal class OpenSslConnection(
                     if (!feedIncoming()) throw TlsException("The server closed the connection during the handshake")
                 }
 
-                kmp_ssl_error_want_write() -> drainOutgoing()
+                kmp_ssl_error_want_write() -> {
+                    drainOutgoing()
+                }
 
-                else -> throw TlsException("TLS handshake failed: ${describeFailure()}")
+                else -> {
+                    throw TlsException("TLS handshake failed: ${describeFailure()}")
+                }
             }
         }
     }
@@ -247,16 +251,22 @@ internal class OpenSslConnection(
             if (read > 0) return read
 
             when (SSL_get_error(ssl, read)) {
-                kmp_ssl_error_zero_return() -> return -1
+                kmp_ssl_error_zero_return() -> {
+                    return -1
+                }
 
                 kmp_ssl_error_want_read() -> {
                     drainOutgoing()
                     if (!feedIncoming()) return -1
                 }
 
-                kmp_ssl_error_want_write() -> drainOutgoing()
+                kmp_ssl_error_want_write() -> {
+                    drainOutgoing()
+                }
 
-                else -> throw TlsException("TLS read failed: ${OpenSslTlsProvider.lastError()}")
+                else -> {
+                    throw TlsException("TLS read failed: ${OpenSslTlsProvider.lastError()}")
+                }
             }
         }
     }
@@ -280,9 +290,13 @@ internal class OpenSslConnection(
                     if (!feedIncoming()) throw TlsException("The server closed the connection while writing")
                 }
 
-                kmp_ssl_error_want_write() -> drainOutgoing()
+                kmp_ssl_error_want_write() -> {
+                    drainOutgoing()
+                }
 
-                else -> throw TlsException("TLS write failed: ${OpenSslTlsProvider.lastError()}")
+                else -> {
+                    throw TlsException("TLS write failed: ${OpenSslTlsProvider.lastError()}")
+                }
             }
         }
     }
