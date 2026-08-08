@@ -24,33 +24,18 @@ public data class SmtpReply(
                 throw SmtpProtocolException("Ответ не содержит ни одной строки")
             }
 
-            var code: SmtpReplyCode? = null
-            val texts = ArrayList<String>(rawLines.size)
-            var finished = false
+            val reader = SmtpReplyReader()
+            var parsed: SmtpReply? = null
 
             for (line in rawLines) {
-                if (finished) {
+                if (parsed != null) {
                     throw SmtpProtocolException("После финальной строки ответа идёт ещё одна: '$line'")
                 }
-
-                val parsed = SmtpReplyLine.parse(line)
-                if (code != null && code != parsed.code) {
-                    // rfc5321.txt:2771: код на всех строках одного ответа обязан совпадать.
-                    throw SmtpProtocolException(
-                        "Код в строках одного ответа различается: $code и ${parsed.code}",
-                    )
-                }
-
-                code = parsed.code
-                texts += parsed.text
-                finished = parsed.isFinal
+                parsed = reader.feed(line)
             }
 
-            if (!finished) {
-                throw SmtpProtocolException("Ответ оборван: последняя строка помечена как продолжение")
-            }
-
-            return SmtpReply(requireNotNull(code), texts)
+            return parsed
+                ?: throw SmtpProtocolException("Ответ оборван: последняя строка помечена как продолжение")
         }
     }
 }
