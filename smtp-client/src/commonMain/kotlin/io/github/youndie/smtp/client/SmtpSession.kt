@@ -128,6 +128,16 @@ public class SmtpSession internal constructor(
     ): DeliveryResult {
         checkSupported(envelope, options)
 
+        val pipelined = options.pipelining && announced.supportsPipelining && !options.chunking
+        return if (pipelined) sendPipelined(envelope, body, options) else sendStepByStep(envelope, body, options)
+    }
+
+    /** One command at a time. Simple, and the only way when the server offers no PIPELINING. */
+    private suspend fun sendStepByStep(
+        envelope: Envelope,
+        body: List<String>,
+        options: SendOptions,
+    ): DeliveryResult {
         val mail =
             exchange(
                 SmtpCommand.MailFrom(envelope.sender, mailParameters(options)),
@@ -157,16 +167,93 @@ public class SmtpSession internal constructor(
             return DeliveryResult(accepted = emptyList(), rejected = rejected, acceptance = null)
         }
 
-        val data = exchange(SmtpCommand.Data, "DATA", config.timeouts.dataInitiation)
+        return if (options.chunking && announced.supportsChunking) {
+            DeliveryResult(accepted, rejected, sendWithBdat(body))
+        } else {
+            val data = exchange(SmtpCommand.Data, "DATA", config.timeouts.dataInitiation)
+            if (data.code.severity != SmtpReplySeverity.POSITIVE_INTERMEDIATE) {
+                throw SmtpRefusedException("DATA", data)
+            }
+            DeliveryResult(accepted, rejected, sendBody(body))
+        }
+    }
+
+    /**
+     * `MAIL`, every `RCPT` and `DATA` in one write — `docs/rfc/rfc2920.txt:137`.
+     *
+     * The replies are then read in order and matched by position, because matching them by code or
+     * by text is expressly forbidden (`docs/rfc/rfc2920.txt:177`).
+     */
+    private suspend fun sendPipelined(
+        envelope: Envelope,
+        body: List<String>,
+        options: SendOptions,
+    ): DeliveryResult {
+        val group =
+            buildString {
+                append(SmtpCommand.MailFrom(envelope.sender, mailParameters(options)).encode())
+                envelope.recipients.forEach { recipient ->
+                    append(SmtpCommand.RcptTo(recipient, recipientParameters(recipient, options)).encode())
+                }
+                append(SmtpCommand.Data.encode())
+            }
+
+        write(group, "sending the pipelined group", config.timeouts.mailCommand)
+
+        val mail = readReply("the reply to MAIL FROM", config.timeouts.mailCommand)
+
+        val accepted = mutableListOf<Mailbox>()
+        val rejected = mutableListOf<RejectedRecipient>()
+        envelope.recipients.forEach { recipient ->
+            val reply = readReply("the reply to RCPT TO", config.timeouts.recipientCommand)
+            if (reply.isPositiveCompletion) accepted += recipient else rejected += RejectedRecipient(recipient, reply)
+        }
+
+        val data = readReply("the reply to DATA", config.timeouts.dataInitiation)
+
+        // Checked only now: every reply of the group has to be read, whatever the first one said,
+        // or the next command would be answered by a reply belonging to this one.
+        if (!mail.isPositiveCompletion) throw SmtpRefusedException("MAIL FROM", mail)
+
         if (data.code.severity != SmtpReplySeverity.POSITIVE_INTERMEDIATE) {
+            if (accepted.isEmpty()) return DeliveryResult(emptyList(), rejected, null)
             throw SmtpRefusedException("DATA", data)
         }
 
+        if (accepted.isEmpty()) {
+            // rfc2920.txt:160: DATA was accepted, so the message has to be ended even though it is
+            // going nowhere. Without the dot the server waits for a message that never finishes.
+            write(MailData.TERMINATOR, "ending an empty message", config.timeouts.dataTermination)
+            readReply("the reply to the end of the message", config.timeouts.dataTermination)
+            return DeliveryResult(emptyList(), rejected, null)
+        }
+
+        return DeliveryResult(accepted, rejected, sendBody(body))
+    }
+
+    private suspend fun sendBody(body: List<String>): SmtpReply {
         write(MailData.encode(body), "sending the message body", config.timeouts.dataBlock)
         val acceptance = readReply("the reply to the end of the message", config.timeouts.dataTermination)
         if (!acceptance.isPositiveCompletion) throw SmtpRefusedException("end of DATA", acceptance)
+        return acceptance
+    }
 
-        return DeliveryResult(accepted = accepted, rejected = rejected, acceptance = acceptance)
+    /**
+     * `BDAT` — `docs/rfc/rfc3030.txt:140`.
+     *
+     * The chunk is sent verbatim: chunking replaces the dot protocol, so there is no stuffing and
+     * no terminating dot. Applying either would put an extra period into the delivered message.
+     */
+    private suspend fun sendWithBdat(body: List<String>): SmtpReply {
+        val chunk = body.joinToString(CRLF, postfix = CRLF)
+        val octets = chunk.encodeToByteArray().size
+
+        write("BDAT $octets LAST$CRLF", "sending BDAT", config.timeouts.dataInitiation)
+        write(chunk, "sending the chunk", config.timeouts.dataBlock)
+
+        val acceptance = readReply("the reply to BDAT", config.timeouts.dataTermination)
+        if (!acceptance.isPositiveCompletion) throw SmtpRefusedException("BDAT", acceptance)
+        return acceptance
     }
 
     /**

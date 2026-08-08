@@ -146,7 +146,7 @@ class PipeliningTest {
                     serverSays("250 Ok")
                     clientWrites("RCPT TO:<first@example.com>\r\n")
                     serverSays("250 Ok")
-                    clientWrites("BDAT 24 LAST\r\n")
+                    clientWrites("BDAT 22 LAST\r\n")
                     clientWrites("Subject: hi\r\n\r\n.body\r\n")
                     serverSays("250 Ok")
                 }

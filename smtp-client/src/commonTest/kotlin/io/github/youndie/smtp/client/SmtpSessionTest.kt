@@ -359,7 +359,9 @@ class SmtpSessionTest {
         fun ScriptedTransport.Builder.greeting() {
             serverSays("220 smtp.example.com")
             clientWrites("EHLO client.example.com\r\n")
-            serverSays("250-smtp.example.com", "250 PIPELINING")
+            // No PIPELINING here on purpose: these tests are about the step-by-step flow, and a
+            // server offering it would make the client group the commands instead.
+            serverSays("250 smtp.example.com")
         }
 
         /** One accepted message for a single recipient. */
