@@ -42,6 +42,7 @@
   E2E против сервера из `docker-compose.yml`.
 - [rfc/README.md](rfc/README.md) — 42 копии RFC в репозитории, разложенные по вехам.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M10 и задачи `M-NN`.
+- [../RELEASING.md](../RELEASING.md) — процедура выпуска и почему артефакты собираются с двух машин.
 
 ## Карта покрытия
 
