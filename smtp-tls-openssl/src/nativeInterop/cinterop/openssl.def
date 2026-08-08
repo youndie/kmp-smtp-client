@@ -1,0 +1,32 @@
+headers = openssl/ssl.h openssl/err.h openssl/bio.h openssl/x509v3.h openssl/opensslv.h
+headerFilter = openssl/**
+package = openssl
+
+# Include and library paths are not written here on purpose: Homebrew keeps headers under a
+# versioned prefix and Debian keeps the libraries in a multiarch directory, so both are discovered
+# in build.gradle.kts instead of being frozen into this file.
+
+---
+
+// Everything below is a macro in OpenSSL's headers, and cinterop does not see macros.
+
+static int kmp_ssl_set_tlsext_host_name(SSL *ssl, const char *name) {
+    return (int) SSL_set_tlsext_host_name(ssl, name);
+}
+
+static long kmp_ssl_ctx_set_min_proto_version(SSL_CTX *ctx, int version) {
+    return SSL_CTX_set_min_proto_version(ctx, version);
+}
+
+static long kmp_bio_pending(BIO *bio) {
+    return BIO_ctrl_pending(bio);
+}
+
+static int kmp_tls1_2_version(void) { return TLS1_2_VERSION; }
+
+// Result codes of SSL_get_error and the verification modes are macros as well.
+static int kmp_ssl_error_want_read(void)   { return SSL_ERROR_WANT_READ; }
+static int kmp_ssl_error_want_write(void)  { return SSL_ERROR_WANT_WRITE; }
+static int kmp_ssl_error_zero_return(void) { return SSL_ERROR_ZERO_RETURN; }
+static int kmp_ssl_verify_peer(void)       { return SSL_VERIFY_PEER; }
+static int kmp_ssl_verify_none(void)       { return SSL_VERIFY_NONE; }

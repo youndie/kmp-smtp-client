@@ -112,15 +112,15 @@ M-31 (сценарный транспорт) сделан здесь, а не в
 
 ## M4 — TLS
 
-- [ ] **M-40** Порт `TlsProvider` в `:smtp-core`: «байты в байты» + параметры проверки и SNI ([D2](docs/research/research-architecture.md))
-- [ ] **M-41** `:smtp-tls-openssl`: `.def` для cinterop к OpenSSL 3.x, сборка на linuxX64
-- [ ] **M-42** Рукопожатие поверх memory BIO, без доступа к дескриптору сокета ([следствие 3](docs/research/research-architecture.md))
-- [ ] **M-43** Implicit TLS на 465 (`rfc8314.txt`)
+- [x] **M-40** Байтовый порт `ByteConnection` + `LineFramedTransport` + порт `TlsProvider` ([D2](docs/research/research-architecture.md))
+- [x] **M-41** `:smtp-tls-openssl`: `.def` для cinterop к OpenSSL 3.x, сборка на linuxX64
+- [x] **M-42** Рукопожатие поверх memory BIO, без доступа к дескриптору сокета ([следствие 3](docs/research/research-architecture.md))
+- [x] **M-43** Implicit TLS на 465 (`rfc8314.txt`) — проверено против `mailpit-tls` в `docker-compose.yml`
 - [ ] **M-44** `STARTTLS` на 587 со сбросом состояния и повторным `EHLO` (`rfc3207.txt:210`)
-- [ ] **M-45** Проверка цепочки сертификатов; тест с самоподписанным сертификатом **обязан** падать ([риск 2](docs/research/research-architecture.md))
-- [ ] **M-46** Сверка имени хоста по `rfc7817.txt` / `rfc9525.txt`; тест с валидным сертификатом на чужое имя обязан падать
-- [ ] **M-47** Проверка версии OpenSSL при инициализации с внятным сообщением ([риск 1](docs/research/research-architecture.md))
-- [ ] **M-48** Сборка и тесты в alpine/musl отдельным заданием CI
+- [x] **M-45** Проверка цепочки сертификатов; тест с самоподписанным сертификатом **обязан** падать ([риск 2](docs/research/research-architecture.md))
+- [x] **M-46** Сверка имени хоста по `rfc7817.txt` / `rfc9525.txt`; тест с валидным сертификатом на чужое имя обязан падать
+- [x] **M-47** Проверка версии OpenSSL при инициализации с внятным сообщением ([риск 1](docs/research/research-architecture.md))
+- [ ] **M-48** ~~alpine/musl~~ → проверить бинарник в дистрибутиве с другой glibc и задокументировать, что musl не поддерживается: Kotlin/Native собран под glibc и на alpine не работает ни компилятор, ни бинарники (KT-38891, KT-38876)
 
 ## M5 — аутентификация
 

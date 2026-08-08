@@ -1,6 +1,6 @@
 name: kmp-smtp-client
 
-# SMTP-сервер для интеграционных и E2E-тестов.
+# SMTP-серверы для интеграционных и E2E-тестов.
 #
 # Mailpit выбран не как «настоящий» MTA, а как сервер, на котором можно что-то утверждать:
 # он говорит по SMTP по-настоящему (EHLO с расширениями, PIPELINING, AUTH, STARTTLS), но
@@ -9,20 +9,48 @@ name: kmp-smtp-client
 #
 # Плата за это — терпимость: Mailpit принимает почти всё, поэтому нарушения строгости
 # протокола он не поймает. Проверка против настоящего Postfix заведена как M-37.
+#
+# Сертификаты берутся из ./build/e2e-certs; создать их — `tools/generate-test-certs.sh`.
+# В репозитории их нет намеренно: сертификат в git протухает и потом роняет тесты по причине,
+# не имеющей отношения к коду.
 services:
+  # Открытый канал плюс STARTTLS на том же порту — сценарий сабмишна на 587.
   mailpit:
     image: axllent/mailpit:v1.30.7
     container_name: kmp-smtp-mailpit
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # HTTP: веб-интерфейс и API, по которому тест читает принятые письма
+    volumes:
+      - ./build/e2e-certs:/certs:ro
     environment:
       # Любые учётные данные принимаются: до M5 механизмы SASL не реализованы, а отвергать
       # AUTH сервер не должен — иначе тесты M5 придётся заводить отдельным сервисом.
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
-      # Без этого Mailpit требует TLS для AUTH. TLS появится на M4; тогда флаг уйдёт вместе
-      # с сертификатами, которые будут смонтированы сюда же.
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_SMTP_TLS_CERT: /certs/server.pem
+      MP_SMTP_TLS_KEY: /certs/server-key.pem
+      MP_MAX_MESSAGES: "0"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Implicit TLS — сценарий сабмишна на 465 (`docs/rfc/rfc8314.txt`).
+  mailpit-tls:
+    image: axllent/mailpit:v1.30.7
+    container_name: kmp-smtp-mailpit-tls
+    ports:
+      - "1465:1025"
+      - "8465:8025"
+    volumes:
+      - ./build/e2e-certs:/certs:ro
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_TLS_CERT: /certs/server.pem
+      MP_SMTP_TLS_KEY: /certs/server-key.pem
+      MP_SMTP_REQUIRE_TLS: "true"
       MP_MAX_MESSAGES: "0"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]

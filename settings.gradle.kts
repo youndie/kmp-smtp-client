@@ -19,4 +19,5 @@ rootProject.name = "kmp-smtp-client"
 include(":smtp-core")
 include(":smtp-client")
 include(":smtp-testing")
+include(":smtp-tls-openssl")
 include(":smtp-transport-ktor")
