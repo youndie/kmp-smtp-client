@@ -41,7 +41,7 @@
 - [x] [research-architecture](research/research-architecture.md)
 
 ### Protocol (1/1)
-- [x] [protocol-smtp](api/protocol-smtp.md)
+- [x] [protocol-smtp](api/protocol-smtp.md) — разделы 1–2, 4–5, 8 реализованы в `smtp-core`
 
 ### Features (0)
 - [ ] `feature-send-message` — появится на M2
