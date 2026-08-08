@@ -17,4 +17,6 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 rootProject.name = "kmp-smtp-client"
 
 include(":smtp-core")
+include(":smtp-client")
+include(":smtp-testing")
 include(":smtp-transport-ktor")
