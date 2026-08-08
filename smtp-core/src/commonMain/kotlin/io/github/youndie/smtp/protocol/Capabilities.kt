@@ -1,24 +1,24 @@
 package io.github.youndie.smtp.protocol
 
 /**
- * Расширения, объявленные сервером в ответе на `EHLO` — `docs/rfc/rfc5321.txt:1841`.
+ * The extensions a server announced in its `EHLO` reply — `docs/rfc/rfc5321.txt:1841`.
  *
- * Значение живёт внутри одной фазы сессии: после `STARTTLS` (`docs/rfc/rfc3207.txt:210`) и после
- * `AUTH` с security layer (`docs/rfc/rfc4954.txt:297`) прежний список недействителен и его
- * обязаны заменить новым. Привязку к фазе делает M-21; здесь только разбор.
+ * The value belongs to one phase of a session: after `STARTTLS` (`docs/rfc/rfc3207.txt:210`) and
+ * after `AUTH` with a security layer (`docs/rfc/rfc4954.txt:297`) the previous list is void and
+ * must be replaced. Binding it to a phase is M-21; this is parsing only.
  */
 public class Capabilities internal constructor(
-    /** Первая строка ответа: домен сервера и приветствие. Расширением не является. */
+    /** The first reply line: the server domain and its greeting. Not an extension. */
     public val greeting: String,
     private val entries: Map<String, List<String>>,
 ) {
-    /** Объявленные ключевые слова в верхнем регистре. */
+    /** The announced keywords, upper-cased. */
     public val keywords: Set<String> get() = entries.keys
 
-    /** Ключевые слова регистронезависимы — `docs/rfc/rfc5321.txt:1869`. */
+    /** Keywords are case-insensitive — `docs/rfc/rfc5321.txt:1869`. */
     public operator fun contains(keyword: String): Boolean = keyword.uppercase() in entries
 
-    /** Параметры ключевого слова; пустой список — и когда параметров нет, и когда нет слова. */
+    /** Parameters of a keyword; empty both when there are none and when the keyword is absent. */
     public fun parametersOf(keyword: String): List<String> = entries[keyword.uppercase()].orEmpty()
 
     public val supportsPipelining: Boolean get() = PIPELINING in this
@@ -30,15 +30,16 @@ public class Capabilities internal constructor(
     public val supportsDsn: Boolean get() = DSN in this
 
     /**
-     * Предельный размер письма из `SIZE` — `docs/rfc/rfc1870.txt:70`.
+     * The maximum message size from `SIZE` — `docs/rfc/rfc1870.txt:70`.
      *
-     * `null` означает «предел неизвестен»: сервер либо не назвал число, либо назвал `0`, что по
-     * `docs/rfc/rfc1870.txt:79` значит «фиксированного предела нет». Это **не** ноль байт.
+     * `null` means "the limit is unknown": the server either named no number or named `0`, which
+     * per `docs/rfc/rfc1870.txt:79` means "no fixed maximum is in force". It does **not** mean
+     * zero bytes.
      */
     public val maxMessageSize: Long?
         get() = parametersOf(SIZE).firstOrNull()?.toLongOrNull()?.takeIf { it > 0 }
 
-    /** Механизмы SASL из `AUTH` в верхнем регистре — `docs/rfc/rfc4954.txt`. */
+    /** SASL mechanisms from `AUTH`, upper-cased — `docs/rfc/rfc4954.txt`. */
     public val authMechanisms: Set<String>
         get() = parametersOf(AUTH).mapTo(LinkedHashSet()) { it.uppercase() }
 
@@ -52,25 +53,24 @@ public class Capabilities internal constructor(
         private const val DSN = "DSN"
         private const val SIZE = "SIZE"
         private const val AUTH = "AUTH"
+        private const val EHLO_OK = 250
 
         public fun parse(reply: SmtpReply): Capabilities {
             if (reply.code != SmtpReplyCode(EHLO_OK)) {
-                // rfc5321.txt:1841: расширения объявляются только положительным ответом 250.
-                throw SmtpProtocolException("Ответ на EHLO не 250, расширений в нём нет: ${reply.code}")
+                // rfc5321.txt:1841: extensions are announced only by a positive 250 reply.
+                throw SmtpProtocolException("EHLO reply is not 250, so it announces no extensions: ${reply.code}")
             }
 
             val entries = LinkedHashMap<String, List<String>>()
-            // Первая строка — Domain [SP ehlo-greet], а не ehlo-line (rfc5321.txt:1841).
+            // The first line is Domain [SP ehlo-greet], not an ehlo-line (rfc5321.txt:1841).
             for (line in reply.lines.drop(1)) {
                 val tokens = line.split(' ').filter { it.isNotEmpty() }
                 val keyword = tokens.firstOrNull() ?: continue
-                // rfc5321.txt:1869: ключевые слова обрабатываются регистронезависимо.
+                // rfc5321.txt:1869: keywords are processed case-insensitively.
                 entries[keyword.uppercase()] = tokens.drop(1)
             }
 
             return Capabilities(reply.lines.first(), entries)
         }
-
-        private const val EHLO_OK = 250
     }
 }

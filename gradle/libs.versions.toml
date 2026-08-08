@@ -3,19 +3,19 @@ kotlin = "2.4.10"
 kotlinxCoroutines = "1.11.0"
 ktor = "3.5.2"
 kotlincrypto = "0.8.0"
-# Версия зафиксирована намеренно: ktlint подключён как CLI, без плагина-обёртки.
-# См. docs/research/research-architecture.md, Р10.
+# Pinned on purpose: ktlint is wired in as a CLI, without a wrapper plugin.
+# See docs/research/research-architecture.md, D10.
 ktlint = "1.8.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
-# Транспорт TCP. Живёт только в :smtp-transport-ktor (M3).
-# ktor-network-tls не подключается никогда: на Kotlin/Native это заглушка, см. research 1.1.
+# TCP transport. Lives in :smtp-transport-ktor only (M3).
+# ktor-network-tls is never added: on Kotlin/Native it is a stub, see research 1.1.
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 
-# Криптография для SASL (M5), чистый Kotlin без cinterop.
+# Crypto for SASL (M5), pure Kotlin with no cinterop.
 kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
 kotlincrypto-hmac-md = { module = "org.kotlincrypto.macs:hmac-md", version.ref = "kotlincrypto" }
 

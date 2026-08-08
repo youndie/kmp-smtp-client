@@ -11,8 +11,8 @@ indent_size = 4
 [*.{kt,kts}]
 max_line_length = 120
 ktlint_code_style = ktlint_official
-# Импорты перечисляются явно: звёздочка прячет, откуда пришёл тип, а в этом проекте
-# соседствуют одноимённые сущности из core и из адаптеров.
+# Imports are listed explicitly: a star import hides where a type came from, and this project has
+# similarly named entities living in core and in the adapters side by side.
 ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 ij_kotlin_name_count_to_use_star_import = 2147483647
@@ -23,7 +23,7 @@ trim_trailing_whitespace = false
 max_line_length = off
 
 [docs/rfc/*.txt]
-# Копии RFC не редактируются ничем и никогда.
+# The RFC copies are never edited by anything, ever.
 insert_final_newline = unset
 trim_trailing_whitespace = false
 

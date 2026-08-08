@@ -8,15 +8,15 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Потоковое чтение ответов.
+ * Streaming reply reading.
  *
- * Существует ради `docs/rfc/rfc2920.txt:177`: при PIPELINING ответы сопоставляются с командами
- * счётом, а сопоставление по коду ответа или по тексту прямо запрещено. Значит, читатель обязан
- * отдавать ответы подряд, ничего не зная о командах.
+ * It exists because of `docs/rfc/rfc2920.txt:177`: under PIPELINING replies are matched to
+ * commands by counting, and matching on the reply code or text is expressly forbidden. So the
+ * reader has to hand out replies in order while knowing nothing about commands.
  */
 class SmtpReplyReaderTest {
     @Test
-    fun `многострочный ответ отдаётся только на финальной строке`() {
+    fun `a multiline reply is handed out only on its final line`() {
         val reader = SmtpReplyReader()
 
         assertNull(reader.feed("250-smtp.example.com"))
@@ -29,9 +29,9 @@ class SmtpReplyReaderTest {
     }
 
     @Test
-    fun `один читатель отдаёт несколько ответов подряд`() {
+    fun `one reader hands out several replies in a row`() {
         // rfc2920.txt:177: "Command statuses MUST be coordinated with responses by counting each
-        // separate response". Три ответа на три команды — три вызова, вернувших не-null.
+        // separate response". Three replies to three commands — three non-null returns.
         val reader = SmtpReplyReader()
         val replies = listOf("250 OK", "250 Accepted", "354 End data with <CRLF>.<CRLF>").mapNotNull(reader::feed)
 
@@ -40,7 +40,7 @@ class SmtpReplyReaderTest {
     }
 
     @Test
-    fun `смена кода посреди ответа — протокольная ошибка`() {
+    fun `a code change in the middle of a reply is a protocol error`() {
         // rfc5321.txt:2771
         val reader = SmtpReplyReader()
         reader.feed("250-smtp.example.com")
@@ -49,7 +49,7 @@ class SmtpReplyReaderTest {
     }
 
     @Test
-    fun `читатель знает — дочитан ответ или нет`() {
+    fun `the reader knows whether a reply is complete`() {
         val reader = SmtpReplyReader()
 
         assertTrue(reader.isIdle)
@@ -62,7 +62,7 @@ class SmtpReplyReaderTest {
     }
 
     @Test
-    fun `слишком длинная строка — протокольная ошибка и здесь`() {
+    fun `an over-long line is a protocol error here too`() {
         // rfc5321.txt:3504
         val reader = SmtpReplyReader()
 
@@ -70,7 +70,7 @@ class SmtpReplyReaderTest {
     }
 
     @Test
-    fun `разбор ответа целиком — тот же читатель`() {
+    fun `parsing a whole reply goes through the same reader`() {
         val lines = listOf("250-smtp.example.com", "250 SIZE 35882577")
 
         assertEquals(SmtpReply.parse(lines), SmtpReplyReader().let { lines.mapNotNull(it::feed).single() })

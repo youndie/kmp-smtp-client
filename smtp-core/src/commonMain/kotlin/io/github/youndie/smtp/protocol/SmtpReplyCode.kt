@@ -2,28 +2,28 @@ package io.github.youndie.smtp.protocol
 
 import kotlin.jvm.JvmInline
 
-/** Исход, заданный первой цифрой кода ответа — `docs/rfc/rfc5321.txt:2642`. */
+/** The outcome carried by the first digit of a reply code — `docs/rfc/rfc5321.txt:2642`. */
 public enum class SmtpReplySeverity {
-    /** 2xx — команда выполнена. */
+    /** 2xx — the command succeeded. */
     POSITIVE_COMPLETION,
 
-    /** 3xx — команда принята, сервер ждёт продолжения (`354` перед телом письма). */
+    /** 3xx — accepted, the server waits for more (`354` before the message body). */
     POSITIVE_INTERMEDIATE,
 
-    /** 4xx — временный отказ: то же самое имеет смысл повторить позже. */
+    /** 4xx — transient refusal: the same request may succeed later. */
     TRANSIENT_NEGATIVE,
 
-    /** 5xx — постоянный отказ: повтор в том же виде бессмыслен. */
+    /** 5xx — permanent refusal: retrying the same request is pointless. */
     PERMANENT_NEGATIVE,
 }
 
 /**
- * Трёхзначный код ответа SMTP.
+ * A three-digit SMTP reply code.
  *
- * ABNF — `docs/rfc/rfc5321.txt:2600`: `Reply-code = %x32-35 %x30-35 %x30-39`. Проверяется только
- * первая цифра: `docs/rfc/rfc5321.txt:3043` требует от клиента обрабатывать неизвестные коды
- * «by interpreting the first digit only», и падать на второй цифре, выходящей за ABNF, значит
- * ломаться из-за чужой небрежности там, где протокол велит быть терпимым.
+ * ABNF — `docs/rfc/rfc5321.txt:2600`: `Reply-code = %x32-35 %x30-35 %x30-39`. Only the first digit
+ * is validated: `docs/rfc/rfc5321.txt:3043` requires a client to handle unknown codes "by
+ * interpreting the first digit only", so rejecting a second digit outside the ABNF would mean
+ * breaking on someone else's sloppiness exactly where the protocol asks for tolerance.
  */
 @JvmInline
 public value class SmtpReplyCode(
@@ -31,7 +31,7 @@ public value class SmtpReplyCode(
 ) {
     init {
         if (value !in MIN_VALUE..MAX_VALUE) {
-            throw SmtpProtocolException("Код ответа вне диапазона 2xx…5xx: $value")
+            throw SmtpProtocolException("Reply code outside the 2xx..5xx range: $value")
         }
     }
 

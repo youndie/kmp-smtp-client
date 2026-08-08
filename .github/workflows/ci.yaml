@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Закрывающий прогон вехи: на Linux задача linuxX64Test включена и тесты действительно бегут.
-  # На macOS их запустить нельзя, поэтому локальный цикл идёт на macosArm64 — см. research Р9.
+  # The closing run of a milestone: on Linux the linuxX64Test task is enabled and the tests really
+  # do run. They cannot run on macOS, which is why the local loop uses macosArm64 — see research D9.
   linux:
     name: linuxX64 + jvm + ktlint
     runs-on: ubuntu-latest
@@ -28,14 +28,14 @@ jobs:
       - name: build
         run: ./gradlew build --stacktrace
 
-      - name: отчёты о тестах
+      - name: test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-linux
           path: '**/build/reports/tests/**'
 
-  # Хостовый таргет разработки: если он сломается, встанет локальный цикл TDD у всех.
+  # The development host target: if it breaks, everyone's local TDD loop stops.
   macos:
     name: macosArm64
     runs-on: macos-latest
@@ -49,5 +49,5 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: тесты
+      - name: test
         run: ./gradlew macosArm64Test --stacktrace

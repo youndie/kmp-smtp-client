@@ -22,10 +22,10 @@ publishes:
 
 **Чем не занимается:** сокетами, TLS, криптографией, DNS, построением письма. Ничего из этого
 модуль не подключает даже транзитивно — у него нет зависимостей, кроме stdlib. Это и есть условие
-того, что почти все тесты проекта идут без сети (см. [research Р3](../research/research-architecture.md)).
+того, что почти все тесты проекта идут без сети (см. [research D3](../research/research-architecture.md)).
 
 Главный инвариант: **в `:smtp-core` не попадает ни одного типа из чужой библиотеки** — ни
-`ByteReadChannel` из Ktor, ни `Source` из kotlinx-io ([research Р8](../research/research-architecture.md)).
+`ByteReadChannel` из Ktor, ни `Source` из kotlinx-io ([research D8](../research/research-architecture.md)).
 Как только он попадёт, фейк для теста начнёт требовать реализации чужого интерфейса.
 
 ## 2. Контракт
@@ -87,7 +87,7 @@ publishes:
 
 * **`macosArm64` в списке таргетов — инструмент, а не поддерживаемая платформа.** Тесты `linuxX64`
   на macOS не запускаются, и без хостового таргета цикл TDD невозможен
-  ([research Р9](../research/research-architecture.md)). Транспорт и TLS под apple делаются на M8.
+  ([research D9](../research/research-architecture.md)). Транспорт и TLS под apple делаются на M8.
 * **`linuxX64Test` на не-Linux хосте выключается самим KGP**, а `kotlin.native.ignoreDisabledTargets=true`
   в `gradle.properties` глушит предупреждение об этом. Если однажды окажется, что тесты «зелёные»,
   а никто их не запускал, — смотреть сюда. В CI (ubuntu) задача включена, и веха закрывается там.

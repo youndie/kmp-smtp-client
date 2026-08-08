@@ -1,32 +1,32 @@
 package io.github.youndie.smtp.protocol
 
 /**
- * Команда клиента.
+ * A client command.
  *
- * [line] — строка без `CRLF`, [encode] — то, что уходит в сокет. Предел длины проверяется в
- * [encode], а не в конструкторе: у `AUTH` слишком длинный начальный ответ — не ошибка, а повод
- * перейти на отдельный шаг обмена (`docs/rfc/rfc4954.txt:208`), и спросить об этом нужно до
- * отправки, через [fitsLineLimit].
+ * [line] is the command without `CRLF`, [encode] is what goes into the socket. The length limit is
+ * enforced in [encode] rather than in the constructor: for `AUTH`, an over-long initial response is
+ * not an error but a reason to fall back to a separate exchange step (`docs/rfc/rfc4954.txt:208`),
+ * and that has to be asked before sending — through [fitsLineLimit].
  */
 public sealed class SmtpCommand {
-    /** Команда без завершающего `CRLF`. */
+    /** The command without its trailing `CRLF`. */
     public abstract val line: String
 
-    /** Помещается ли команда в предел строки — `docs/rfc/rfc5321.txt:3498`. */
+    /** Whether the command fits the line limit — `docs/rfc/rfc5321.txt:3498`. */
     public val fitsLineLimit: Boolean
         get() = line.encodeToByteArray().size <= MAX_LINE_OCTETS_WITHOUT_CRLF
 
-    /** Строка вместе с `CRLF` — то, что уходит в сокет. */
+    /** The line together with `CRLF` — what goes into the socket. */
     public fun encode(): String {
         line.forEach { character ->
             if (character == '\r' || character == '\n') {
-                throw SmtpProtocolException("Перевод строки внутри команды: '$line'")
+                throw SmtpProtocolException("Line break inside a command: '$line'")
             }
         }
 
         if (!fitsLineLimit) {
             throw SmtpProtocolException(
-                "Командная строка длиннее $MAX_LINE_OCTETS_WITHOUT_CRLF октетов без CRLF: " +
+                "Command line longer than $MAX_LINE_OCTETS_WITHOUT_CRLF octets without CRLF: " +
                     "${line.encodeToByteArray().size}",
             )
         }
@@ -41,7 +41,7 @@ public sealed class SmtpCommand {
         override val line: String get() = "EHLO $clientIdentity"
     }
 
-    /** `HELO` — только как откат для серверов без ESMTP. */
+    /** `HELO` — only as a fallback for servers without ESMTP. */
     public data class Helo(
         public val clientIdentity: String,
     ) : SmtpCommand() {
@@ -51,8 +51,9 @@ public sealed class SmtpCommand {
     /**
      * `MAIL FROM:` — `docs/rfc/rfc5321.txt:1913`.
      *
-     * [sender] `null` — пустой обратный путь `<>` (`docs/rfc/rfc5321.txt:2260`): так отправляются
-     * отчёты о недоставке, которые сами не должны порождать отчётов.
+     * A `null` [sender] is the null reverse-path `<>` (`docs/rfc/rfc5321.txt:2260`): that is how
+     * delivery status notifications are sent, since they must not trigger notifications of their
+     * own.
      */
     public data class MailFrom(
         public val sender: Mailbox?,
@@ -62,7 +63,7 @@ public sealed class SmtpCommand {
             get() = "MAIL FROM:${sender?.path ?: "<>"}".withParameters(parameters)
     }
 
-    /** `RCPT TO:` — `docs/rfc/rfc5321.txt:1913`, по одной команде на получателя. */
+    /** `RCPT TO:` — `docs/rfc/rfc5321.txt:1913`, one command per recipient. */
     public data class RcptTo(
         public val recipient: Mailbox,
         public val parameters: List<String> = emptyList(),
@@ -75,7 +76,7 @@ public sealed class SmtpCommand {
         override val line: String get() = "DATA"
     }
 
-    /** `RSET` — сбрасывает транзакцию, не трогая аутентификацию. */
+    /** `RSET` — resets the transaction without touching authentication. */
     public data object Rset : SmtpCommand() {
         override val line: String get() = "RSET"
     }
@@ -90,7 +91,7 @@ public sealed class SmtpCommand {
         override val line: String get() = "STARTTLS"
     }
 
-    /** `NOOP` — при PIPELINING служит точкой синхронизации (`docs/rfc/rfc2920.txt:137`). */
+    /** `NOOP` — under PIPELINING it doubles as a synchronisation point (`docs/rfc/rfc2920.txt:137`). */
     public data class Noop(
         public val text: String? = null,
     ) : SmtpCommand() {
@@ -107,7 +108,7 @@ public sealed class SmtpCommand {
     }
 
     public companion object {
-        /** `docs/rfc/rfc5321.txt:3498`: 512 октетов вместе с `CRLF`. */
+        /** `docs/rfc/rfc5321.txt:3498`: 512 octets including `CRLF`. */
         private const val MAX_LINE_OCTETS_WITHOUT_CRLF = 510
 
         private const val CRLF = "\r\n"

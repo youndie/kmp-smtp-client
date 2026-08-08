@@ -6,13 +6,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * Разбор ответа сервера.
+ * Parsing a server reply.
  *
- * ABNF ответа — `docs/rfc/rfc5321.txt:2597`, значение первой цифры — `docs/rfc/rfc5321.txt:2642`.
+ * Reply ABNF — `docs/rfc/rfc5321.txt:2597`; meaning of the first digit — `docs/rfc/rfc5321.txt:2642`.
  */
 class SmtpReplyTest {
     @Test
-    fun `однострочный ответ разбирается в код и текст`() {
+    fun `single line reply parses into a code and text`() {
         val reply = SmtpReply.parse(listOf("220 smtp.example.com ESMTP ready"))
 
         assertEquals(SmtpReplyCode(220), reply.code)
@@ -20,8 +20,9 @@ class SmtpReplyTest {
     }
 
     @Test
-    fun `код 2xx означает успешное завершение`() {
-        // rfc5321.txt:2642: "Positive Completion reply" — вторая цифра и текст на исход не влияют.
+    fun `a 2xx code means positive completion`() {
+        // rfc5321.txt:2642: "Positive Completion reply" — neither the second digit nor the text
+        // affects the outcome.
         val reply = SmtpReply.parse(listOf("220 smtp.example.com ESMTP ready"))
 
         assertTrue(reply.isPositiveCompletion)
@@ -29,7 +30,7 @@ class SmtpReplyTest {
     }
 
     @Test
-    fun `дефис после кода продолжает ответ — пробел завершает`() {
+    fun `a hyphen after the code continues the reply and a space ends it`() {
         // rfc5321.txt:2597: Reply-line = *( Reply-code "-" [ textstring ] CRLF )
         //                                Reply-code [ SP textstring ] CRLF
         val reply =
@@ -46,7 +47,7 @@ class SmtpReplyTest {
     }
 
     @Test
-    fun `в многострочном ответе код обязан совпадать на всех строках`() {
+    fun `every line of a multiline reply must carry the same code`() {
         // rfc5321.txt:2771: "In a multiline reply, the reply code on each of the lines MUST be
         // the same."
         assertFailsWith<SmtpProtocolException> {
@@ -55,7 +56,7 @@ class SmtpReplyTest {
     }
 
     @Test
-    fun `ответ без текста разбирается — с пробелом и без`() {
+    fun `a reply without text parses with and without the trailing space`() {
         // rfc5321.txt:2571: "clients that do not receive it SHOULD be prepared to process the
         // code alone (with or without a trailing space character)".
         assertEquals(listOf(""), SmtpReply.parse(listOf("250")).lines)
@@ -63,49 +64,49 @@ class SmtpReplyTest {
     }
 
     @Test
-    fun `первая цифра вне диапазона 2-5 — протокольная ошибка`() {
+    fun `a first digit outside 2 to 5 is a protocol error`() {
         // rfc5321.txt:2600: Reply-code = %x32-35 %x30-35 %x30-39.
-        // rfc5321.txt:2620: такие коды клиент "SHOULD normally treat as fatal errors".
+        // rfc5321.txt:2620: a client "SHOULD normally treat as fatal errors" such codes.
         assertFailsWith<SmtpProtocolException> { SmtpReply.parse(listOf("150 no such severity")) }
         assertFailsWith<SmtpProtocolException> { SmtpReply.parse(listOf("650 no such severity")) }
     }
 
     @Test
-    fun `вторая цифра вне диапазона принимается — клиент смотрит только на первую`() {
-        // ABNF на второй цифре разрешает 0-5, но rfc5321.txt:3043 требует от клиента обрабатывать
-        // неизвестные коды "by interpreting the first digit only". Ломаться на чужой небрежности
-        // дороже, чем принять код.
-        val reply = SmtpReply.parse(listOf("260 сервер выдумал код"))
+    fun `a second digit outside the ABNF is accepted because only the first one counts`() {
+        // The ABNF allows 0-5 for the second digit, yet rfc5321.txt:3043 requires a client to
+        // handle unknown codes "by interpreting the first digit only". Breaking on someone else's
+        // sloppiness costs more than accepting the code.
+        val reply = SmtpReply.parse(listOf("260 a code the server made up"))
 
         assertEquals(SmtpReplyCode(260), reply.code)
         assertTrue(reply.isPositiveCompletion)
     }
 
     @Test
-    fun `строка ответа длиннее 512 октетов — протокольная ошибка`() {
-        // rfc5321.txt:3504: предел строки ответа — 512 октетов вместе с CRLF, то есть 510 без него.
+    fun `a reply line longer than 512 octets is a protocol error`() {
+        // rfc5321.txt:3504: a reply line is capped at 512 octets including CRLF, so 510 without it.
         val text = "x".repeat(510 - 4)
-        SmtpReply.parse(listOf("250 $text")) // ровно 510 октетов — ещё можно
+        SmtpReply.parse(listOf("250 $text")) // exactly 510 octets — still allowed
 
         assertFailsWith<SmtpProtocolException> { SmtpReply.parse(listOf("250 ${text}x")) }
     }
 
     @Test
-    fun `предел строки считается в октетах — не в символах`() {
-        // Там же, rfc5321.txt:3504: предел задан в октетах. С SMTPUTF8 (rfc6531.txt) в тексте
-        // ответа бывает не-ASCII, и «256 символов» — это 512 октетов в UTF-8.
-        val cyrillic = "я".repeat(300) // 600 октетов при длине строки 300
+    fun `the line limit is measured in octets rather than characters`() {
+        // Same place, rfc5321.txt:3504: the limit is given in octets. With SMTPUTF8 (rfc6531.txt)
+        // reply text can be non-ASCII, and "256 characters" is 512 octets in UTF-8.
+        val cyrillic = "я".repeat(300) // 600 octets at a string length of 300
 
         assertFailsWith<SmtpProtocolException> { SmtpReply.parse(listOf("250 $cyrillic")) }
     }
 
     @Test
-    fun `пустой список строк — протокольная ошибка`() {
+    fun `an empty list of lines is a protocol error`() {
         assertFailsWith<SmtpProtocolException> { SmtpReply.parse(emptyList()) }
     }
 
     @Test
-    fun `оборванный на дефисе ответ не считается разобранным`() {
+    fun `a reply cut off on a continuation line does not count as parsed`() {
         assertFailsWith<SmtpProtocolException> {
             SmtpReply.parse(listOf("250-smtp.example.com", "250-PIPELINING"))
         }

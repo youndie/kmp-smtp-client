@@ -3,7 +3,7 @@
 Вехи закрываются целиком. **GATE вехи**: все её тесты зелёные на `linuxX64`, `ktlintCheck` чист,
 документы слоёв обновлены в том же коммите. Промежуточных зачётов нет.
 
-**Процесс внутри задачи** ([research Р7](docs/research/research-architecture.md)): сначала тест со
+**Процесс внутри задачи** ([research D7](docs/research/research-architecture.md)): сначала тест со
 ссылкой на строку RFC в `docs/rfc/`, тест красный — потом реализация. Задача без ссылки на
 спецификацию в тесте не считается сделанной.
 
@@ -16,8 +16,8 @@
 
 - [x] **M-01** Координаты публикации: `io.github.youndie`, артефакты `smtp-<модуль>`, пакет `io.github.youndie.smtp` — решено в ресёрче
 - [x] **M-02** Gradle-скелет: `settings.gradle.kts`, каталог версий `gradle/libs.versions.toml` (Kotlin 2.4.10, coroutines 1.11.0, ktor 3.5.2, kotlincrypto 0.8.0), конвенция сборки для KMP-модулей
-- [x] **M-03** Модуль `:smtp-core` с таргетами `linuxX64`, `macosArm64`, `jvm` ([Р9](docs/research/research-architecture.md)); пустой, но собирается и прогоняет тесты
-- [x] **M-04** ktlint: конфигурация `ktlint` с `com.pinterest.ktlint:ktlint-cli:1.8.0`, задачи `ktlintCheck` / `ktlintFormat`, `.editorconfig` со стилем `ktlint_official` ([Р10](docs/research/research-architecture.md))
+- [x] **M-03** Модуль `:smtp-core` с таргетами `linuxX64`, `macosArm64`, `jvm` ([D9](docs/research/research-architecture.md)); пустой, но собирается и прогоняет тесты
+- [x] **M-04** ktlint: конфигурация `ktlint` с `com.pinterest.ktlint:ktlint-cli:1.8.0`, задачи `ktlintCheck` / `ktlintFormat`, `.editorconfig` со стилем `ktlint_official` ([D10](docs/research/research-architecture.md))
 - [x] **M-05** CI на GitHub Actions: `ubuntu-latest`, сборка + тесты `linuxX64` + `ktlintCheck` на каждый PR
 - [x] **M-06** README, LICENSE (MIT), CONTRIBUTING с правилом «тест по RFC → код → GATE»
 - [x] **M-07** Первый красный тест: парсер однострочного ответа `220` (`rfc5321.txt:2642`) — доказывает, что цикл TDD работает целиком
@@ -79,7 +79,7 @@
 
 ## M3 — транспорт и первое реальное соединение
 
-- [ ] **M-30** Порт `TcpTransport` в `:smtp-core` без чужих типов буферов ([Р8](docs/research/research-architecture.md))
+- [ ] **M-30** Порт `TcpTransport` в `:smtp-core` без чужих типов буферов ([D8](docs/research/research-architecture.md))
 - [ ] **M-31** `:smtp-testing`: сценарный транспорт («сервер сказал X, ждём от клиента Y») для юнит-тестов
 - [ ] **M-32** `:smtp-transport-ktor` на `ktor-network` 3.5.2, таргет `linuxX64`
 - [ ] **M-33** Чтение ответов отдельной корутиной, независимо от записи — условие безопасного PIPELINING (`rfc2920.txt:183`)
@@ -89,7 +89,7 @@
 
 ## M4 — TLS
 
-- [ ] **M-40** Порт `TlsProvider` в `:smtp-core`: «байты в байты» + параметры проверки и SNI ([Р2](docs/research/research-architecture.md))
+- [ ] **M-40** Порт `TlsProvider` в `:smtp-core`: «байты в байты» + параметры проверки и SNI ([D2](docs/research/research-architecture.md))
 - [ ] **M-41** `:smtp-tls-openssl`: `.def` для cinterop к OpenSSL 3.x, сборка на linuxX64
 - [ ] **M-42** Рукопожатие поверх memory BIO, без доступа к дескриптору сокета ([следствие 3](docs/research/research-architecture.md))
 - [ ] **M-43** Implicit TLS на 465 (`rfc8314.txt`)
@@ -135,8 +135,8 @@
 - [ ] **M-80** `linuxArm64`
 - [ ] **M-81** `mingwX64`: TLS через Schannel либо OpenSSL — решение принимается по результату M4
 - [ ] **M-82** `macosX64` / `macosArm64` как поддерживаемая платформа, а не только инструмент разработки
-- [ ] **M-83** Apple-таргеты: TLS через Network.framework / Security ([Р2](docs/research/research-architecture.md))
-- [ ] **M-84** `js` / `wasmJs` под Node; браузерный вариант не публикуется — TCP там отсутствует ([Р5](docs/research/research-architecture.md))
+- [ ] **M-83** Apple-таргеты: TLS через Network.framework / Security ([D2](docs/research/research-architecture.md))
+- [ ] **M-84** `js` / `wasmJs` под Node; браузерный вариант не публикуется — TCP там отсутствует ([D5](docs/research/research-architecture.md))
 
 ## M9 — построение письма
 

@@ -1,19 +1,19 @@
 package io.github.youndie.smtp.protocol
 
 /**
- * Адрес конверта: локальная часть и домен — `docs/rfc/rfc5321.txt:2314`.
+ * An envelope address: a local part and a domain — `docs/rfc/rfc5321.txt:2314`.
  *
- * Это **адрес конверта**, а не адрес из заголовков письма: у них разные грамматики (5321 против
- * 5322) и совпадать они не обязаны.
+ * This is the **envelope** address, not an address from the message headers: the two follow
+ * different grammars (5321 versus 5322) and are not required to match.
  */
 public class Mailbox private constructor(
     public val localPart: String,
     public val domain: String,
 ) {
-    /** `localPart@domain` без угловых скобок. */
+    /** `localPart@domain` without the angle brackets. */
     public val address: String get() = "$localPart@$domain"
 
-    /** Путь для `MAIL FROM:` и `RCPT TO:` — `docs/rfc/rfc5321.txt:2264`. */
+    /** The path for `MAIL FROM:` and `RCPT TO:` — `docs/rfc/rfc5321.txt:2264`. */
     public val path: String get() = "<$address>"
 
     override fun toString(): String = address
@@ -28,42 +28,45 @@ public class Mailbox private constructor(
         private const val MAX_DOMAIN_OCTETS = 255
         private const val MAX_PATH_OCTETS = 256
 
-        /** Длина угловых скобок вокруг адреса — они входят в предел пути. */
+        /** The angle brackets around the address; they count towards the path limit. */
         private const val PATH_BRACKETS_OCTETS = 2
 
         public fun parse(text: String): Mailbox {
-            // Проверяется раньше всего: с CRLF внутри адрес перестаёт быть адресом и становится
-            // способом дописать серверу команду (rfc5321.txt:763).
+            // Checked before anything else: with a CRLF inside, an address stops being an address
+            // and becomes a way to append a command of one's choosing (rfc5321.txt:763).
             text.forEach { character ->
                 if (character == '\r' || character == '\n') {
-                    throw SmtpProtocolException("Перевод строки внутри адреса: '$text'")
+                    throw SmtpProtocolException("Line break inside an address: '$text'")
                 }
                 if (character == '<' || character == '>') {
-                    throw SmtpProtocolException("Угловая скобка внутри адреса: '$text'")
+                    throw SmtpProtocolException("Angle bracket inside an address: '$text'")
                 }
             }
 
-            // Локальная часть бывает quoted-string и может содержать '@' (rfc5321.txt:2322),
-            // поэтому разделитель — последний, а не первый.
+            // The local part can be a quoted string and may contain '@' (rfc5321.txt:2322), so the
+            // separator is the last one, not the first.
             val separator = text.lastIndexOf('@')
             if (separator <= 0 || separator == text.lastIndex) {
-                throw SmtpProtocolException("Адрес не имеет вида localPart@domain: '$text'")
+                throw SmtpProtocolException("Address is not of the form localPart@domain: '$text'")
             }
 
             val localPart = text.substring(0, separator)
             val domain = text.substring(separator + 1)
 
-            checkOctets(localPart, MAX_LOCAL_PART_OCTETS, "Локальная часть адреса")
-            checkOctets(domain, MAX_DOMAIN_OCTETS, "Домен адреса")
+            checkOctets(localPart, MAX_LOCAL_PART_OCTETS, "Address local part")
+            checkOctets(domain, MAX_DOMAIN_OCTETS, "Address domain")
 
-            // rfc5321.txt:3493: предел пути задан "including the punctuation and element
-            // separators" — то есть вместе с '@' и обеими скобками.
-            checkOctets(text, MAX_PATH_OCTETS - PATH_BRACKETS_OCTETS, "Путь")
+            // rfc5321.txt:3493: the path limit is stated "including the punctuation and element
+            // separators" — that is, together with the '@' and both brackets.
+            checkOctets(text, MAX_PATH_OCTETS - PATH_BRACKETS_OCTETS, "Path")
 
             return Mailbox(localPart, domain)
         }
 
-        /** Пределы заданы в октетах (`docs/rfc/rfc5321.txt:3484`), а с SMTPUTF8 это не то же самое, что символы. */
+        /**
+         * The limits are given in octets (`docs/rfc/rfc5321.txt:3484`), which with SMTPUTF8 is not
+         * the same thing as characters.
+         */
         private fun checkOctets(
             value: String,
             limit: Int,
@@ -71,7 +74,7 @@ public class Mailbox private constructor(
         ) {
             val octets = value.encodeToByteArray().size
             if (octets > limit) {
-                throw SmtpProtocolException("$what длиннее $limit октетов: $octets")
+                throw SmtpProtocolException("$what longer than $limit octets: $octets")
             }
         }
     }

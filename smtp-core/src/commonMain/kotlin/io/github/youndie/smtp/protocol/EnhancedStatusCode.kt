@@ -1,10 +1,11 @@
 package io.github.youndie.smtp.protocol
 
 /**
- * Расширенный код состояния вида `5.7.1` — `docs/rfc/rfc3463.txt:128`.
+ * An enhanced status code such as `5.7.1` — `docs/rfc/rfc3463.txt:128`.
  *
- * Реестр значений — `docs/rfc/rfc5248.txt`; здесь только разбор, без попытки объяснить смысл
- * каждой пары подкодов: реестр пополняется, и зашитая таблица устареет раньше библиотеки.
+ * The registry of values lives in `docs/rfc/rfc5248.txt`. Only parsing happens here, with no
+ * attempt to explain what each pair of sub-codes means: the registry keeps growing, and a table
+ * baked into the code would rot before the library does.
  */
 public data class EnhancedStatusCode(
     public val statusClass: Int,
@@ -15,10 +16,10 @@ public data class EnhancedStatusCode(
 
     public companion object {
         /**
-         * Разбирает первое слово текста ответа.
+         * Parses the first word of a reply's text.
          *
-         * Возвращает `null`, если слово расширенным кодом не является: текст ответа — обычная
-         * строка, и принять её за код опаснее, чем не заметить настоящий.
+         * Returns `null` when the word is not an enhanced status code: reply text is an ordinary
+         * string, and mistaking one for a code is worse than missing one.
          */
         public fun parseOrNull(token: String): EnhancedStatusCode? {
             val parts = token.split('.')
@@ -43,9 +44,11 @@ public data class EnhancedStatusCode(
         private val ALLOWED_CLASSES = setOf(2, 4, 5)
 
         /**
-         * Подкод — от одной до трёх цифр без ведущих нулей (`docs/rfc/rfc3463.txt:128`, `:138`).
+         * A sub-code is one to three digits with no leading zeros (`docs/rfc/rfc3463.txt:128`,
+         * `:138`).
          *
-         * `toIntOrNull` здесь недостаточно: он проглотит и `+2`, и `007`, и пробелы.
+         * `toIntOrNull` is not enough here: it happily swallows `+2`, `007` and surrounding
+         * whitespace.
          */
         private fun String.toSubCodeOrNull(): Int? {
             if (length !in 1..MAX_SUB_CODE_DIGITS) return null

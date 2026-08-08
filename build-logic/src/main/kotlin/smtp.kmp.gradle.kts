@@ -5,7 +5,7 @@ plugins {
 }
 
 kotlin {
-    // Библиотека: видимость каждого публичного объявления пишется руками, тип возврата тоже.
+    // A library: every public declaration spells out its visibility and its return type.
     explicitApi()
 
     jvmToolchain(21)
@@ -16,11 +16,11 @@ kotlin {
         }
     }
 
-    // Целевая платформа номер один; по ней закрываются вехи.
+    // Target platform number one; milestones are closed against it.
     linuxX64()
 
-    // Хостовый таргет для локального цикла TDD: тесты linuxX64 на macOS не запускаются.
-    // См. docs/research/research-architecture.md, Р9.
+    // The host target for the local TDD loop: linuxX64 tests do not run on macOS.
+    // See docs/research/research-architecture.md, D9.
     macosArm64()
 
     compilerOptions {

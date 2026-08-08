@@ -5,14 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * Адрес и путь конверта.
+ * Envelope addresses and paths.
  *
- * ABNF — `docs/rfc/rfc5321.txt:2314` (Mailbox) и `:2264` (Path); пределы длин —
+ * ABNF — `docs/rfc/rfc5321.txt:2314` (Mailbox) and `:2264` (Path); length limits —
  * `docs/rfc/rfc5321.txt:3484`, `:3489`, `:3493`.
  */
 class MailboxTest {
     @Test
-    fun `адрес разбирается на локальную часть и домен`() {
+    fun `an address parses into a local part and a domain`() {
         val mailbox = Mailbox.parse("user@example.com")
 
         assertEquals("user", mailbox.localPart)
@@ -21,15 +21,15 @@ class MailboxTest {
     }
 
     @Test
-    fun `путь оборачивается в угловые скобки`() {
+    fun `a path is wrapped in angle brackets`() {
         // rfc5321.txt:2264: Path = "<" [ A-d-l ":" ] Mailbox ">"
         assertEquals("<user@example.com>", Mailbox.parse("user@example.com").path)
     }
 
     @Test
-    fun `регистр локальной части сохраняется`() {
-        // rfc5321.txt:2316: "Local-part ... MAY be case-sensitive". Приведение к нижнему регистру
-        // — молчаливая порча чужого адреса.
+    fun `the case of the local part is preserved`() {
+        // rfc5321.txt:2316: "Local-part ... MAY be case-sensitive". Lower-casing it is a silent
+        // corruption of somebody's address.
         val mailbox = Mailbox.parse("John.Doe@Example.COM")
 
         assertEquals("John.Doe", mailbox.localPart)
@@ -37,8 +37,8 @@ class MailboxTest {
     }
 
     @Test
-    fun `собака в адресе ищется с конца`() {
-        // Quoted-string в локальной части может содержать '@' (rfc5321.txt:2322).
+    fun `the at sign is searched for from the end`() {
+        // A quoted string in the local part may contain '@' (rfc5321.txt:2322).
         val mailbox = Mailbox.parse("\"weird@local\"@example.com")
 
         assertEquals("\"weird@local\"", mailbox.localPart)
@@ -46,7 +46,7 @@ class MailboxTest {
     }
 
     @Test
-    fun `локальная часть длиннее 64 октетов — ошибка`() {
+    fun `a local part longer than 64 octets is rejected`() {
         // rfc5321.txt:3484
         Mailbox.parse("${"a".repeat(64)}@example.com")
 
@@ -54,43 +54,43 @@ class MailboxTest {
     }
 
     @Test
-    fun `домен длиннее 255 октетов — ошибка`() {
+    fun `a domain longer than 255 octets is rejected`() {
         // rfc5321.txt:3489
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user@${"d".repeat(256)}") }
     }
 
     @Test
-    fun `путь длиннее 256 октетов — ошибка при законных частях`() {
-        // rfc5321.txt:3493: предел пути — 256 октетов "including the punctuation and element
-        // separators". 64 + 1 + 200 + 2 = 267: обе части в пределах, путь — нет.
+    fun `a path longer than 256 octets is rejected even when both parts are legal`() {
+        // rfc5321.txt:3493: the path limit counts "including the punctuation and element
+        // separators". 64 + 1 + 200 + 2 = 267: both parts fit, the path does not.
         assertFailsWith<SmtpProtocolException> {
             Mailbox.parse("${"a".repeat(64)}@${"d".repeat(200)}")
         }
     }
 
     @Test
-    fun `пределы считаются в октетах — не в символах`() {
-        // Там же; с SMTPUTF8 (rfc6531.txt) адрес бывает не-ASCII, и 40 кириллических символов —
-        // это 80 октетов.
+    fun `the limits are measured in octets rather than characters`() {
+        // Same place; with SMTPUTF8 (rfc6531.txt) an address can be non-ASCII, and 40 Cyrillic
+        // characters are 80 octets.
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("${"я".repeat(40)}@example.com") }
     }
 
     @Test
-    fun `перевод строки в адресе — ошибка`() {
-        // Иначе адрес становится способом дописать команду: всё, что после CRLF, сервер прочтёт
-        // как следующую команду (rfc5321.txt:763 — CRLF разделяет строки протокола).
+    fun `a line break inside an address is rejected`() {
+        // Otherwise an address becomes a way to append a command: everything after the CRLF is
+        // read by the server as the next command (rfc5321.txt:763 — CRLF separates protocol lines).
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user\r\nRCPT TO:<evil@example.com>@example.com") }
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user@example.com\nDATA") }
     }
 
     @Test
-    fun `угловые скобки внутри адреса — ошибка`() {
+    fun `angle brackets inside an address are rejected`() {
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user<@example.com") }
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user@example.com>") }
     }
 
     @Test
-    fun `адрес без собаки или без одной из частей — ошибка`() {
+    fun `an address without an at sign or without one of its parts is rejected`() {
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user") }
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("user@") }
         assertFailsWith<SmtpProtocolException> { Mailbox.parse("@example.com") }

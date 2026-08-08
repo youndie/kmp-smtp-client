@@ -8,9 +8,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Разбор ответа на `EHLO`.
+ * Parsing the `EHLO` reply.
  *
- * ABNF — `docs/rfc/rfc5321.txt:1841`; ключевые слова и параметры — `:1858`, `:1860`, `:1864`.
+ * ABNF — `docs/rfc/rfc5321.txt:1841`; keywords and parameters — `:1858`, `:1860`, `:1864`.
  */
 class CapabilitiesTest {
     private val fullReply =
@@ -28,9 +28,9 @@ class CapabilitiesTest {
         )
 
     @Test
-    fun `первая строка — приветствие и не расширение`() {
-        // rfc5321.txt:1841: ehlo-ok-rsp начинается с Domain [SP ehlo-greet], расширения идут
-        // со второй строки.
+    fun `the first line is the greeting and not an extension`() {
+        // rfc5321.txt:1841: ehlo-ok-rsp starts with Domain [SP ehlo-greet]; extensions begin on
+        // the second line.
         val capabilities = Capabilities.parse(fullReply)
 
         assertEquals("smtp.example.com Hello client.example.com", capabilities.greeting)
@@ -38,7 +38,7 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `ключевые слова читаются независимо от регистра`() {
+    fun `keywords are read case-insensitively`() {
         // rfc5321.txt:1869: "Although EHLO keywords may be specified in upper, lower, or mixed
         // case, they MUST always be recognized and processed in a case-insensitive manner."
         val capabilities = Capabilities.parse(fullReply)
@@ -49,14 +49,14 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `расширения в нижнем регистре понимаются так же`() {
+    fun `extensions announced in lower case are understood the same way`() {
         val capabilities = Capabilities.parse(SmtpReply.parse(listOf("250-smtp.example.com", "250 starttls")))
 
         assertTrue("STARTTLS" in capabilities)
     }
 
     @Test
-    fun `параметры ключевого слова сохраняются`() {
+    fun `keyword parameters are preserved`() {
         // rfc5321.txt:1858: ehlo-line = ehlo-keyword *( SP ehlo-param )
         val capabilities = Capabilities.parse(fullReply)
 
@@ -65,12 +65,12 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `SIZE отдаёт предельный размер письма`() {
+    fun `SIZE yields the maximum message size`() {
         assertEquals(35882577L, Capabilities.parse(fullReply).maxMessageSize)
     }
 
     @Test
-    fun `SIZE без параметра и SIZE ноль означают отсутствие известного предела`() {
+    fun `SIZE without a value and SIZE zero both mean no known limit`() {
         // rfc1870.txt:79: "A parameter value of 0 (zero) indicates that no fixed maximum message
         // size is in force. If the parameter is omitted no information is conveyed".
         assertNull(Capabilities.parse(SmtpReply.parse(listOf("250-host", "250 SIZE"))).maxMessageSize)
@@ -78,14 +78,14 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `механизмы AUTH приводятся к верхнему регистру`() {
+    fun `AUTH mechanisms are upper-cased`() {
         val capabilities = Capabilities.parse(SmtpReply.parse(listOf("250-host", "250 AUTH plain login")))
 
         assertEquals(setOf("PLAIN", "LOGIN"), capabilities.authMechanisms)
     }
 
     @Test
-    fun `однострочный ответ означает сервер без расширений`() {
+    fun `a single line reply means a server without extensions`() {
         val capabilities = Capabilities.parse(SmtpReply.parse(listOf("250 smtp.example.com")))
 
         assertEquals("smtp.example.com", capabilities.greeting)
@@ -94,9 +94,9 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `неизвестное расширение сохраняется вместе с параметрами`() {
-        // Реестр расширений пополняется; выбрасывать незнакомое значит терять то, ради чего
-        // библиотеку потом придётся править.
+    fun `an unknown extension is kept along with its parameters`() {
+        // The extension registry keeps growing; dropping what we do not recognise loses exactly
+        // the thing the library would later have to be patched for.
         val capabilities = Capabilities.parse(SmtpReply.parse(listOf("250-host", "250 FUTURERELEASE 86400 2038")))
 
         assertTrue("FUTURERELEASE" in capabilities)
@@ -104,7 +104,7 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `известные расширения доступны отдельными свойствами`() {
+    fun `known extensions are exposed as separate properties`() {
         val capabilities = Capabilities.parse(fullReply)
 
         assertTrue(capabilities.supportsPipelining)
@@ -117,7 +117,7 @@ class CapabilitiesTest {
     }
 
     @Test
-    fun `ответ не 250 расширениями не является`() {
+    fun `a reply other than 250 announces no extensions`() {
         assertFailsWith<SmtpProtocolException> {
             Capabilities.parse(SmtpReply.parse(listOf("500 Command not recognized")))
         }
