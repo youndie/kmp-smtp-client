@@ -41,4 +41,14 @@ public data class SendOptions(
     public val bodyEncoding: BodyEncoding? = null,
     public val internationalized: Boolean = false,
     public val deliveryStatus: DeliveryStatusRequest? = null,
+    /**
+     * Send the transaction as one group where the server offers `PIPELINING`
+     * (`docs/rfc/rfc2920.txt`). Turning it off costs a round trip per recipient.
+     */
+    public val pipelining: Boolean = true,
+    /**
+     * Use `BDAT` instead of `DATA` where the server offers `CHUNKING`
+     * (`docs/rfc/rfc3030.txt`). The body then travels verbatim: no dot-stuffing, no terminator.
+     */
+    public val chunking: Boolean = false,
 )

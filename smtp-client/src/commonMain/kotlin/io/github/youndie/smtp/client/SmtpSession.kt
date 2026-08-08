@@ -125,20 +125,27 @@ public class SmtpSession internal constructor(
         envelope: Envelope,
         body: List<String>,
         options: SendOptions = SendOptions(),
-    ): DeliveryResult = TODO("M-62")
-
-    private suspend fun sendInternal(
-        envelope: Envelope,
-        body: List<String>,
     ): DeliveryResult {
-        val mail = exchange(SmtpCommand.MailFrom(envelope.sender), "MAIL FROM", config.timeouts.mailCommand)
+        checkSupported(envelope, options)
+
+        val mail =
+            exchange(
+                SmtpCommand.MailFrom(envelope.sender, mailParameters(options)),
+                "MAIL FROM",
+                config.timeouts.mailCommand,
+            )
         if (!mail.isPositiveCompletion) throw SmtpRefusedException("MAIL FROM", mail)
 
         val accepted = mutableListOf<Mailbox>()
         val rejected = mutableListOf<RejectedRecipient>()
 
         for (recipient in envelope.recipients) {
-            val reply = exchange(SmtpCommand.RcptTo(recipient), "RCPT TO", config.timeouts.recipientCommand)
+            val reply =
+                exchange(
+                    SmtpCommand.RcptTo(recipient, recipientParameters(recipient, options)),
+                    "RCPT TO",
+                    config.timeouts.recipientCommand,
+                )
             // 250 and 251 both mean accepted (`docs/rfc/rfc5321.txt:2642`).
             if (reply.isPositiveCompletion) accepted += recipient else rejected += RejectedRecipient(recipient, reply)
         }
@@ -161,6 +168,77 @@ public class SmtpSession internal constructor(
 
         return DeliveryResult(accepted = accepted, rejected = rejected, acceptance = acceptance)
     }
+
+    /**
+     * Refuses upfront what the server cannot do.
+     *
+     * Checking here rather than letting the server answer is not an optimisation: a parameter the
+     * server never announced is a syntax error on its side, and the useful message ("this relay
+     * has no 8BITMIME") would be lost behind a generic 501.
+     */
+    private fun checkSupported(
+        envelope: Envelope,
+        options: SendOptions,
+    ) {
+        options.declaredSize?.let { size ->
+            val limit = announced.maxMessageSize
+            if (limit != null && size > limit) {
+                throw SmtpProtocolException("The message is $size octets and the server accepts at most $limit")
+            }
+        }
+
+        if (options.bodyEncoding == BodyEncoding.EIGHT_BIT && !announced.supports8BitMime) {
+            throw SmtpProtocolException(
+                "The server does not announce 8BITMIME; sending 8-bit content down a 7-bit path " +
+                    "corrupts the message instead of failing",
+            )
+        }
+
+        val needsUtf8 = options.internationalized || envelope.isInternationalized()
+        if (needsUtf8 && !announced.supportsSmtpUtf8) {
+            throw SmtpProtocolException(
+                "The envelope holds non-ASCII but the server does not announce SMTPUTF8 " +
+                    "(docs/rfc/rfc6531.txt)",
+            )
+        }
+
+        if (options.deliveryStatus != null && !announced.supportsDsn) {
+            throw SmtpProtocolException("The server does not announce DSN (docs/rfc/rfc3461.txt)")
+        }
+    }
+
+    /** An envelope is internationalized when any address needs more than ASCII to write down. */
+    private fun Envelope.isInternationalized(): Boolean =
+        (listOfNotNull(sender) + recipients).any { mailbox ->
+            mailbox.address.any { character -> character.code > MAX_ASCII }
+        }
+
+    /** Order is fixed so that a scripted test can compare the whole line. */
+    private fun mailParameters(options: SendOptions): List<String> =
+        buildList {
+            options.declaredSize
+                ?.takeIf { announced.maxMessageSize != null || SIZE in announced }
+                ?.let { add("SIZE=$it") }
+            options.bodyEncoding?.let { add("BODY=${it.parameterValue}") }
+            if (options.internationalized) add("SMTPUTF8")
+            options.deliveryStatus?.let { dsn ->
+                add(if (dsn.returnFullMessage) "RET=FULL" else "RET=HDRS")
+                dsn.envelopeId?.let { add("ENVID=$it") }
+            }
+        }
+
+    private fun recipientParameters(
+        recipient: Mailbox,
+        options: SendOptions,
+    ): List<String> =
+        buildList {
+            val dsn = options.deliveryStatus ?: return@buildList
+            if (dsn.notify.isNotEmpty()) {
+                add("NOTIFY=" + dsn.notify.sortedBy { it.ordinal }.joinToString(",") { it.name })
+            }
+            // rfc3461.txt:412: ORCPT names the address the sender originally wrote down.
+            if (dsn.originalRecipient) add("ORCPT=rfc822;${recipient.address}")
+        }
 
     /** `RSET` — drops the current transaction, keeps the session and any authentication. */
     public suspend fun reset() {
@@ -390,6 +468,11 @@ public class SmtpSession internal constructor(
         const val SASL_CANCEL = "*"
 
         const val CRLF = "\r\n"
+
+        /** Above this code point an address needs SMTPUTF8 (`docs/rfc/rfc6531.txt`). */
+        const val MAX_ASCII = 127
+
+        const val SIZE = "SIZE"
     }
 
     private suspend fun <T> withLimit(
