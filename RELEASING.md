@@ -1,5 +1,25 @@
 # Релиз
 
+## Снапшоты
+
+Снапшоты уезжают в приватный Reposilite (`https://reposilite.kotlin.website/snapshots`) — кнопкой
+**Publish snapshot** в Actions. Креды берутся из секретов репозитория `REPOSILITE_USER` и
+`REPOSILITE_SECRET`, подпись не нужна: её требует Central, а снапшот-репозиторий нет.
+
+Задание разложено на два: macOS публикует всё, включая кросс-скомпилированные klib для Linux,
+Windows и Apple, а Linux — только `linuxX64`-половину `:smtp-tls-openssl`, потому что cinterop
+требует заголовков целевой платформы и собрать её больше негде.
+
+Подключение снапшота у потребителя:
+
+```kotlin
+repositories {
+    maven("https://reposilite.kotlin.website/snapshots")
+}
+```
+
+## Релиз
+
 Публикация идёт в Maven Central через Central Portal. Артефакты подписываются; ключ и пароли
 берутся из окружения, поэтому клон репозитория собирается и тестируется, но выпустить релиз
 не может.
