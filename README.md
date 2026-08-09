@@ -1,102 +1,177 @@
 # kmp-smtp-client
 
-SMTP-клиент для Kotlin Multiplatform, сделанный ради одной вещи: **отправить письмо из сервиса на
-Kotlin/Native**, не таща за собой JVM.
+[![ktlint](https://img.shields.io/badge/ktlint%20code--style-%E2%9D%A4-FF4081.svg)](https://ktlint.github.io/)
+[![kotlin](https://img.shields.io/badge/Kotlin-2.4.10-blue?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![native](https://img.shields.io/badge/Native-blue?logoColor=white)](https://kotlinlang.org)
+[![smtp-client](https://reposilite.kotlin.website/api/badge/latest/snapshots/io/github/youndie/smtp-client?name=smtp-client&color=40c14a&prefix=v)](https://reposilite.kotlin.website/#/snapshots/io/github/youndie/smtp-client)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-На JVM задача решена давно (Jakarta Mail, Simple Java Mail). На Kotlin/Native отправить письмо
-сегодня нечем — остаётся дёрнуть `sendmail` через `system()` или обернуть libcurl. Эта библиотека
-закрывает пробел: чистая реализация RFC 5321 поверх сокетов, с STARTTLS, AUTH и разбором
-расширений ESMTP.
+SMTP for Kotlin Multiplatform: RFC 5321 written from the specification, built so that a service on
+Kotlin/Native can send mail without a JVM anywhere in sight.
 
-> **Статус: функциональность закрыта, релиза ещё не было.** Вехи M0–M9 сделаны: протокол, сессия,
-> TLS, аутентификация, расширения ESMTP, построение письма. 173 теста на `linuxX64`, из них шесть
-> против настоящего TLS-сервера в контейнере. Публикация настроена, но не выполнена —
-> см. [RELEASING.md](RELEASING.md).
+On the JVM this was solved long ago — Jakarta Mail, Simple Java Mail. On Kotlin/Native there is
+nothing: the options are shelling out to `sendmail` or wrapping libcurl, and both hide the protocol
+exactly where it needs to be visible. This library implements it instead, over sockets, with
+`STARTTLS`, SASL and the ESMTP extensions.
 
-## Что планируется
+## Overview
 
-- сабмишн по RFC 6409: порт 587 со `STARTTLS` и порт 465 с implicit TLS;
-- `AUTH`: `PLAIN`, `LOGIN`, `CRAM-MD5`, `SCRAM-SHA-1/256`, `XOAUTH2`, `OAUTHBEARER`;
-- расширения: `PIPELINING`, `SIZE`, `8BITMIME`, `SMTPUTF8`, `DSN`, `ENHANCEDSTATUSCODES`,
-  `CHUNKING`;
-- платформы по порядку: `linuxX64` → `jvm` → `linuxArm64`, `mingwX64`, `macos*` → apple → Node.
+- Submission per RFC 6409: port 587 with `STARTTLS`, port 465 with implicit TLS
+- Reply parsing that streams: multiline replies, enhanced status codes, replies matched to commands
+  **by counting**, because matching them by code or text is expressly forbidden
+- Sessions with phases: `EHLO` with a `HELO` fallback, transactions, `RSET`, timeouts whose
+  defaults are the RFC minimums
+- A partial refusal is a **result**, not an exception — losing who did receive the message is the
+  difference between a retry and a duplicate
+- TLS with the certificate chain and the host name actually verified, through OpenSSL on
+  Kotlin/Native and `SSLEngine` on the JVM
+- Seven SASL mechanisms: `PLAIN`, `LOGIN`, `CRAM-MD5`, `SCRAM-SHA-1`, `SCRAM-SHA-256`, `XOAUTH2`,
+  `OAUTHBEARER`
+- ESMTP extensions: `PIPELINING`, `SIZE`, `8BITMIME`, `SMTPUTF8`, `DSN`, `ENHANCEDSTATUSCODES`,
+  `CHUNKING`, plus punycode for internationalised domains
+- Message building: RFC 5322 headers, `multipart/alternative`, attachments, encoded words
+- Anything a rule forbids is refused rather than worked around: a line break inside an address, a
+  subject that would add headers of somebody else's choosing, credentials over a cleartext channel
 
-Вне скоупа: прямая доставка на MX (нужен DNS-резолвер с MX-запросами, которого в Kotlin/Native
-нет), приём почты, IMAP/POP.
-
-## Как это устроено
-
-Ядро не знает про ввод-вывод: парсер ответов, сериализатор команд, разбор расширений и машина
-состояний — функции над строками и байтами. Сокеты, TLS и SASL подключаются как реализации портов.
-Благодаря этому 90% тестов идут без сети, а тест пишется раньше кода — что здесь не пожелание, а
-принятый процесс.
-
-Ktor используется только как транспорт TCP (`ktor-network`) и заперт в одном модуле-адаптере.
-TLS свой: на Kotlin/Native `ktor-network-tls` не работает вовсе — почему и что с этим делать,
-разобрано в ресёрче.
-
-## Быстрый старт
+## Add dependencies
 
 ```kotlin
+repositories {
+    mavenCentral()
+    maven {
+        name = "WipSnapshots"
+        url = uri("https://reposilite.kotlin.website/snapshots")
+    }
+}
+
 dependencies {
-    implementation("io.github.youndie:smtp-client:0.1.0")
-    implementation("io.github.youndie:smtp-transport-ktor:0.1.0")  // сокеты
-    implementation("io.github.youndie:smtp-tls-openssl:0.1.0")     // TLS на Kotlin/Native
-    implementation("io.github.youndie:smtp-tls-jvm:0.1.0")         // TLS на JVM
-    implementation("io.github.youndie:smtp-sasl:0.1.0")            // аутентификация
-    implementation("io.github.youndie:smtp-mime:0.1.0")            // построение письма
+    implementation("io.github.youndie:smtp-client:0.1.0-SNAPSHOT")
+    implementation("io.github.youndie:smtp-transport-ktor:0.1.0-SNAPSHOT")
+    implementation("io.github.youndie:smtp-tls-openssl:0.1.0-SNAPSHOT") // TLS on Kotlin/Native
+    implementation("io.github.youndie:smtp-tls-jvm:0.1.0-SNAPSHOT")     // TLS on the JVM
+    implementation("io.github.youndie:smtp-sasl:0.1.0-SNAPSHOT")        // authentication
+    implementation("io.github.youndie:smtp-mime:0.1.0-SNAPSHOT")        // building messages
 }
 ```
 
-Сабмишн через релей — порт 587, `STARTTLS`, `AUTH`:
+OpenSSL 3 must be installed for the native TLS module: `apt install libssl-dev` on Linux,
+`brew install openssl@3` on macOS. That module builds for the host target only — `cinterop` needs
+the headers of the target platform — so its artefacts are published from two machines.
+
+Snapshots only so far. Maven Central is configured but nothing has been released; see
+[RELEASING.md](RELEASING.md).
+
+## Usage
+
+Submission through a relay: port 587, `STARTTLS`, `AUTH`.
 
 ```kotlin
-val transport = connectSmtp("smtp.example.com", 587)
-val session = openSmtpSession(transport, SmtpClientConfig(clientIdentity = "my-service.example.com"))
+fun main() = runBlocking {
+    val transport = connectSmtp("smtp.example.com", 587)
+    val session = openSmtpSession(
+        transport = transport,
+        config = SmtpClientConfig(clientIdentity = "my-service.example.com"),
+    )
 
-session.startTls(OpenSslTlsProvider, TlsConfig(serverName = "smtp.example.com"))
-session.authenticate(PlainMechanism(username = "user", password = "secret"))
+    session.startTls(OpenSslTlsProvider, TlsConfig(serverName = "smtp.example.com"))
+    session.authenticate(PlainMechanism(username = "user", password = "secret"))
 
-val result = session.send(envelope, body)
-session.quit()
+    val sender = Mailbox.parse("noreply@example.com")
+    val recipient = Mailbox.parse("user@example.com")
+
+    val message = MessageBuilder(from = sender, to = listOf(recipient)).apply {
+        subject = "Hello"
+        text = "Sent without a JVM anywhere in sight."
+        html = "<p>Sent without a JVM anywhere in sight.</p>"
+    }.build(sentAt = Clock.System.now(), messageIdDomain = "example.com")
+
+    val result = session.send(
+        envelope = Envelope(sender = sender, recipients = listOf(recipient)),
+        body = message,
+    )
+
+    println(result.accepted)  // who got it
+    println(result.rejected)  // who did not, and with which code
+    session.quit()
+}
 ```
 
-Полный рабочий пример — [examples/send](examples/send/src/commonMain/kotlin/Main.kt); он
-компилируется каждой сборкой, поэтому не может протухнуть незаметно.
+A runnable version is [examples/send](examples/send/src/commonMain/kotlin/Main.kt); it is compiled
+by every build, so it cannot rot unnoticed.
 
-<details>
-<summary>Без TLS, как это выглядит целиком</summary>
+`SendOptions` carries the ESMTP parameters — `SIZE`, `BODY=8BITMIME`, `SMTPUTF8`, `DSN`, pipelining,
+chunking. A parameter is only sent when the server announced the extension, and asking for one it
+never offered is an error rather than a silent downgrade.
 
-```kotlin
-val transport = connectSmtp("smtp.example.com", 587)
-val session = openSmtpSession(transport, SmtpClientConfig(clientIdentity = "my-service.example.com"))
+## Internals
 
-val result = session.send(
-    envelope = Envelope(
-        sender = Mailbox.parse("noreply@example.com"),
-        recipients = listOf(Mailbox.parse("user@example.com")),
-    ),
-    body = listOf("Subject: hello", "", "text"),
-)
+| Layer | |
+|---|---|
+| Protocol | pure functions over strings and bytes: replies, commands, addresses, transparency. No I/O and no third-party types, so almost every test runs without a socket |
+| Ports | `ByteConnection` under `SmtpTransport` under the session. TLS is inserted between the first two, which is exactly the shape `STARTTLS` needs |
+| Sockets | `ktor-network`, and nothing else from Ktor — `ktor-network-tls` is a stub on Kotlin/Native that throws at runtime |
+| TLS | OpenSSL over memory BIOs on Native, `SSLEngine` on the JVM. Neither is handed a file descriptor: a Ktor socket does not expose one |
+| Limits | every length is measured in **octets**, not characters — with SMTPUTF8 the difference is twofold |
 
-println(result.accepted)   // кому доставлено
-println(result.rejected)   // кому отказано и с каким кодом
-session.quit()
-```
+| Module | |
+|---|---|
+| `smtp-core` | protocol, domain, ports. Depends on the standard library and nothing else |
+| `smtp-client` | sessions, transactions, timeouts, `AUTH` |
+| `smtp-transport-ktor` | TCP; the only place that mentions Ktor |
+| `smtp-tls-openssl` | TLS on Kotlin/Native through cinterop |
+| `smtp-tls-jvm` | TLS on the JVM through `SSLEngine` |
+| `smtp-sasl` | the seven mechanisms |
+| `smtp-mime` | building messages |
+| `smtp-testing` | a scripted transport and a fake SMTP server |
 
-</details>
+Targets: `linuxX64`, `linuxArm64`, `macosX64`, `macosArm64`, `mingwX64`, `iosArm64`, `jvm`, and
+`js` / `wasmJs` for the modules that are useful without a socket. TLS exists on Linux, macOS and the
+JVM; Windows and Apple mobile compile but have no provider yet.
 
-## Документация
+## Testing
 
-- [docs/research/research-architecture.md](docs/research/research-architecture.md) — почему всё
-  устроено именно так, что проверено, чем платим;
-- [docs/api/protocol-smtp.md](docs/api/protocol-smtp.md) — контракт SMTP на проводе;
-- [docs/rfc/](docs/rfc/) — 42 копии RFC, на которые ссылаются тесты;
-- [BACKLOG.md](BACKLOG.md) — вехи и задачи;
-- [docs/README.md](docs/README.md) — карта документации;
-- [CONTRIBUTING.md](CONTRIBUTING.md) — как здесь работают: тест по RFC → код → GATE, и как гонять
-  E2E против сервера из [docker-compose.yml](docker-compose.yml).
+181 tests on `linuxX64`, 175 on the JVM. Each cites the line of the RFC it came from, because SMTP
+is full of places where common sense and the specification disagree.
 
-## Лицензия
+The mechanisms are checked against the **vectors printed in their own RFCs**: the CRAM-MD5 digest of
+RFC 2195, and the full SCRAM exchanges of RFC 5802 and RFC 7677, server signature included. A vector
+out of the specification catches an implementation that is wrong in the same way twice, which a
+self-consistent test never does.
 
-[MIT](LICENSE).
+TLS is verified by two tests that must **fail**: an unknown certificate authority, and a valid
+certificate issued for another name. Until those go red when verification breaks, TLS is not
+considered checked — encrypting without proving anything looks exactly like working.
+
+End to end runs against two servers, because they disagree. Mailpit answers over HTTP, so the test
+asks what was actually stored instead of trusting a `250`; Postfix is strict, and refused
+`example.com` on the first attempt because that domain publishes a null MX. The body carries a line
+holding a single period — with dot-stuffing wrong it either truncates or arrives doubled, and both
+look like success on the wire.
+
+One connection carries 1000 messages and is still a working session afterwards, at roughly
+1800 messages/s against an in-process server. That number measures the client, not a network.
+
+## What this is not
+
+- **Not a mail server, and not direct-to-MX delivery.** Sending straight to a recipient's MX needs a
+  DNS resolver that can ask for MX records, and Kotlin/Native has only `getaddrinfo`.
+- **Not a complete MIME stack.** Headers, `multipart/alternative`, attachments — yes. S/MIME, deeply
+  nested parts and RFC 2231 parameters — no.
+- **Not usable in a browser.** There is no TCP socket there, so a browser artefact could not work
+  even in principle; `js` and `wasmJs` are published only for the modules that do not need one.
+- **Not SASLprep-complete.** Mapping and prohibition are applied, Unicode normalisation is not:
+  Kotlin has no normalisation in common code. ASCII credentials are unaffected.
+
+## Documentation
+
+[docs/](docs/) — the architecture research with the reasoning behind each decision, the wire
+contract every test is written from, and 42 RFCs kept in the repository so that a citation can be
+opened offline. Written in Russian.
+
+Read the research before changing anything: several decisions here are counter-intuitive, and the
+backlog records what was measured and turned out otherwise — starting with `Socket.tls()` on
+Kotlin/Native, which compiles and then throws.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
