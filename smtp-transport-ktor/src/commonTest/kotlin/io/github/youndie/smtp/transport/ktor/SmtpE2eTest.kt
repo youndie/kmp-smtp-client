@@ -7,6 +7,11 @@ import io.github.youndie.smtp.protocol.SmtpCommand
 import io.github.youndie.smtp.protocol.SmtpReply
 import io.github.youndie.smtp.protocol.SmtpReplyReader
 import io.github.youndie.smtp.transport.SmtpTransport
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.parameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -31,6 +36,9 @@ class SmtpE2eTest {
             val host = e2eHostOrSkip() ?: return@runTest
             val port = environmentVariable("SMTP_E2E_PORT")?.toInt() ?: DEFAULT_PORT
             val recipient = environmentVariable("SMTP_E2E_RECIPIENT") ?: DEFAULT_RECIPIENT
+            // Unique per run: the server keeps what earlier runs sent, and a fixed subject
+            // would make the search find somebody else's message.
+            val subject = "kmp-smtp-client e2e ${nextRunId()}"
 
             withContext(Dispatchers.Default) {
                 val transport = connectSmtp(host, port)
@@ -47,16 +55,57 @@ class SmtpE2eTest {
                     assertEquals(250, session.exchange(SmtpCommand.RcptTo(Mailbox.parse(recipient))).code.value)
                     assertEquals(354, session.exchange(SmtpCommand.Data).code.value)
 
-                    transport.write(MailData.encode(message(recipient)))
+                    transport.write(MailData.encode(message(recipient, subject)))
                     val accepted = session.read()
                     assertEquals(250, accepted.code.value, "the server accepted the message")
 
                     assertEquals(221, session.exchange(SmtpCommand.Quit).code.value)
+
+                    verifyStoredMessage(host, subject)
                 } finally {
                     transport.close()
                 }
             }
         }
+
+    /**
+     * Asks the server what it actually stored.
+     *
+     * A 250 says the server took the message, not that it took *this* message. The check that
+     * matters is the line holding a single period: if dot-stuffing were wrong it would either end
+     * the message early or arrive doubled, and both look like success on the wire.
+     *
+     * Skipped where there is no API to ask — Postfix has none, and the E2E runs against it too.
+     */
+    private suspend fun verifyStoredMessage(
+        host: String,
+        subject: String,
+    ) {
+        val apiPort = environmentVariable("SMTP_E2E_API_PORT")?.toInt() ?: return
+
+        val api = HttpClient(CIO)
+        val raw =
+            try {
+                val listing =
+                    api
+                        .get("http://$host:$apiPort/api/v1/search") {
+                            url { parameters.append("query", subject) }
+                        }.bodyAsText()
+
+                val id =
+                    Regex("\"ID\":\"([^\"]+)\"").find(listing)?.groupValues?.get(1)
+                        ?: fail("the server stored no message with subject '$subject': $listing")
+
+                api.get("http://$host:$apiPort/api/v1/message/$id/raw").bodyAsText()
+            } finally {
+                api.close()
+            }
+
+        assertTrue(raw.contains("before the period"), "the body was truncated: $raw")
+        assertTrue(raw.contains("after the period"), "the message ended at the lone period: $raw")
+        assertTrue(raw.contains("\r\n.\r\n") || raw.contains("\n.\n"), "the lone period did not survive: $raw")
+        assertTrue(!raw.contains("\r\n..\r\n"), "the period arrived doubled: $raw")
+    }
 
     /**
      * The body carries a line consisting of a single period.
@@ -65,11 +114,14 @@ class SmtpE2eTest {
      * (`docs/rfc/rfc5321.txt:3423`) the message would end right there, and the server would read
      * the remaining lines as commands — so the reply to the body would not be 250.
      */
-    private fun message(recipient: String): List<String> =
+    private fun message(
+        recipient: String,
+        subject: String,
+    ): List<String> =
         listOf(
             "From: <$SENDER>",
             "To: <$recipient>",
-            "Subject: kmp-smtp-client end-to-end",
+            "Subject: $subject",
             "",
             "before the period",
             ".",
@@ -107,6 +159,18 @@ class SmtpE2eTest {
          * the point, so the address has to be a parameter.
          */
         const val DEFAULT_RECIPIENT = "recipient@example.com"
+
+        /**
+         * Something different on every run.
+         *
+         * The clock is enough: the servers keep what earlier runs sent, and two runs in the same
+         * millisecond would need the test to be started twice by the same command.
+         */
+        fun nextRunId(): String =
+            kotlin.time.Clock.System
+                .now()
+                .toEpochMilliseconds()
+                .toString(36)
 
         /**
          * Without a server the test cannot run, and `kotlin.test` has no way to report a skip.

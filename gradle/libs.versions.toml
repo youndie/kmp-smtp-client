@@ -21,6 +21,9 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 # TCP transport. Lives in :smtp-transport-ktor only (M3).
 # ktor-network-tls is never added: on Kotlin/Native it is a stub, see research 1.1.
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
+# Test-only: asking Mailpit over HTTP what it stored. The CIO engine covers every target
+# this project declares, which is why it can live in a common test source set.
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 
 # Crypto for SASL (M5), pure Kotlin with no cinterop.
 kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }

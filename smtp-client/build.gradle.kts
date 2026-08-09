@@ -12,6 +12,8 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(projects.smtpTesting)
+            // The load measurement needs a real socket, and that is this module's job.
+            implementation(projects.smtpTransportKtor)
             implementation(libs.kotlinx.coroutines.test)
         }
     }
