@@ -19,8 +19,9 @@ import kotlin.time.Clock
  * number — that message number N behaves like message number one, and that the session is still
  * usable afterwards.
  *
- * Against the in-process fake by default, which measures the client. Point it at a real server
- * with `SMTP_LOAD_HOST` to measure the pair.
+ * It runs against the in-process fake, so it measures the client rather than a network. That is
+ * the honest scope: a number taken against a container on the same machine would look like a
+ * throughput figure for a real relay, and it is not one.
  */
 class ConnectionLoadTest {
     @Test

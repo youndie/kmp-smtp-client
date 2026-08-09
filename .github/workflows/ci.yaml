@@ -21,6 +21,8 @@ jobs:
       SMTP_E2E_REQUIRED: "1"
       SMTP_TLS_E2E_HOST: 127.0.0.1
       SMTP_TLS_E2E_PORT: "1465"
+      # Mailpit answers over HTTP, so the E2E can check what was stored and not just the reply.
+      SMTP_E2E_API_PORT: "8025"
 
     steps:
       - uses: actions/checkout@v5
@@ -50,6 +52,8 @@ jobs:
         env:
           SMTP_E2E_PORT: "1587"
           SMTP_E2E_RECIPIENT: rcpt@postfix.test
+          # Postfix has no API to ask, so the content check is skipped for this run.
+          SMTP_E2E_API_PORT: ""
         run: ./gradlew :smtp-transport-ktor:jvmTest --rerun-tasks --stacktrace
 
       - name: server logs
