@@ -4,14 +4,12 @@ import io.github.youndie.smtp.client.Envelope
 import io.github.youndie.smtp.client.SmtpClientConfig
 import io.github.youndie.smtp.client.openSmtpSession
 import io.github.youndie.smtp.protocol.Mailbox
-import io.github.youndie.smtp.protocol.SmtpRefusedException
 import io.github.youndie.smtp.transport.ktor.connectSmtp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -75,7 +73,12 @@ class FakeSmtpServerTest {
 
             assertEquals(1, result.accepted.size)
             assertEquals(1, result.rejected.size)
-            assertEquals(550, result.rejected.single().reply.code.value)
+            assertEquals(
+                550,
+                result.rejected
+                    .single()
+                    .reply.code.value,
+            )
             assertEquals(1, server.received.size)
         }
 
@@ -100,25 +103,45 @@ class FakeSmtpServerTest {
             }
 
             assertEquals(2, server.received.size)
-            assertEquals("Subject: number 0", server.received.first().body.first())
-            assertEquals("Subject: number 1", server.received.last().body.first())
+            assertEquals(
+                "Subject: number 0",
+                server.received
+                    .first()
+                    .body
+                    .first(),
+            )
+            assertEquals(
+                "Subject: number 1",
+                server.received
+                    .last()
+                    .body
+                    .first(),
+            )
         }
 
     @Test
     fun `a strict server refuses a command line over 512 octets`() =
-        withServer(strict = true) { _, session ->
-            // rfc5321.txt:3498. Mailpit takes such a line without complaint, which is exactly why
-            // a strict fake is worth having.
-            val long = "a".repeat(500)
-            assertFailsWith<SmtpRefusedException> {
-                session.send(
-                    envelope =
-                        Envelope(
-                            sender = Mailbox.parse("$long@example.com"),
-                            recipients = listOf(Mailbox.parse("rcpt@example.com")),
-                        ),
-                    body = listOf("Subject: hi", "", "body"),
-                )
+        runTest {
+            // rfc5321.txt:3498. The client cannot produce such a line — it checks the limit before
+            // writing — so the server is driven directly here. That is the whole reason for a
+            // strict fake: Mailpit takes the line without complaint, and a tolerant server can
+            // never fail a client that breaks this rule.
+            withContext(Dispatchers.Default) {
+                val server = FakeSmtpServer(strict = true)
+                server.start()
+                try {
+                    val transport = connectSmtp("127.0.0.1", server.port)
+                    try {
+                        assertTrue(transport.readLine().startsWith("220"))
+                        transport.write("NOOP " + "a".repeat(600) + "\r\n")
+
+                        assertTrue(transport.readLine().startsWith("500"), "an over-long line must be refused")
+                    } finally {
+                        transport.close()
+                    }
+                } finally {
+                    server.stop()
+                }
             }
         }
 
