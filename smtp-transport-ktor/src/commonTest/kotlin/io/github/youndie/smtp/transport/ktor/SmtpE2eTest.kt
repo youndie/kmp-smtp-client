@@ -98,6 +98,7 @@ class SmtpE2eTest {
         const val DEFAULT_PORT = 1025
         const val CLIENT_IDENTITY = "kmp-smtp-client.test"
         const val SENDER = "sender@example.com"
+
         /**
          * The default recipient, overridable through the environment.
          *
