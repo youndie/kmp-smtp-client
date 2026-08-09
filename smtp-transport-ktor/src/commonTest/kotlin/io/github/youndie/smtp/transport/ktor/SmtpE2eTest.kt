@@ -30,6 +30,7 @@ class SmtpE2eTest {
         runTest {
             val host = e2eHostOrSkip() ?: return@runTest
             val port = environmentVariable("SMTP_E2E_PORT")?.toInt() ?: DEFAULT_PORT
+            val recipient = environmentVariable("SMTP_E2E_RECIPIENT") ?: DEFAULT_RECIPIENT
 
             withContext(Dispatchers.Default) {
                 val transport = connectSmtp(host, port)
@@ -43,10 +44,10 @@ class SmtpE2eTest {
                     assertTrue(capabilities.greeting.isNotEmpty(), "the server names itself in its EHLO reply")
 
                     assertEquals(250, session.exchange(SmtpCommand.MailFrom(Mailbox.parse(SENDER))).code.value)
-                    assertEquals(250, session.exchange(SmtpCommand.RcptTo(Mailbox.parse(RECIPIENT))).code.value)
+                    assertEquals(250, session.exchange(SmtpCommand.RcptTo(Mailbox.parse(recipient))).code.value)
                     assertEquals(354, session.exchange(SmtpCommand.Data).code.value)
 
-                    transport.write(MailData.encode(message()))
+                    transport.write(MailData.encode(message(recipient)))
                     val accepted = session.read()
                     assertEquals(250, accepted.code.value, "the server accepted the message")
 
@@ -64,10 +65,10 @@ class SmtpE2eTest {
      * (`docs/rfc/rfc5321.txt:3423`) the message would end right there, and the server would read
      * the remaining lines as commands — so the reply to the body would not be 250.
      */
-    private fun message(): List<String> =
+    private fun message(recipient: String): List<String> =
         listOf(
             "From: <$SENDER>",
-            "To: <$RECIPIENT>",
+            "To: <$recipient>",
             "Subject: kmp-smtp-client end-to-end",
             "",
             "before the period",
@@ -97,7 +98,14 @@ class SmtpE2eTest {
         const val DEFAULT_PORT = 1025
         const val CLIENT_IDENTITY = "kmp-smtp-client.test"
         const val SENDER = "sender@example.com"
-        const val RECIPIENT = "recipient@example.com"
+        /**
+         * The default recipient, overridable through the environment.
+         *
+         * Postfix refuses example.com with 556 nullMX — the domain says outright that it takes no
+         * mail — while Mailpit accepts it without a word. Running the same test against both is
+         * the point, so the address has to be a parameter.
+         */
+        const val DEFAULT_RECIPIENT = "recipient@example.com"
 
         /**
          * Without a server the test cannot run, and `kotlin.test` has no way to report a skip.

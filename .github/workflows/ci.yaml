@@ -43,6 +43,15 @@ jobs:
       - name: build
         run: ./gradlew build --stacktrace
 
+      # The same E2E against a real Postfix. Mailpit accepts almost anything, so it cannot fail
+      # a client that breaks the rules; Postfix can, and already did — it refuses example.com
+      # outright because the domain publishes a null MX.
+      - name: E2E against Postfix
+        env:
+          SMTP_E2E_PORT: "1587"
+          SMTP_E2E_RECIPIENT: rcpt@postfix.test
+        run: ./gradlew :smtp-transport-ktor:jvmTest --rerun-tasks --stacktrace
+
       - name: server logs
         if: failure()
         run: docker compose logs --tail 50

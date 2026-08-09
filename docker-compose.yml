@@ -37,6 +37,35 @@ services:
       timeout: 2s
       retries: 30
 
+  # Настоящий Postfix. Mailpit удобен тем, что отдаёт принятые письма по HTTP, но принимает почти
+  # всё; строгость проверяется здесь. Письма никуда не уходят: исходящей доставки нет, всё оседает
+  # в очереди — для теста важен ответ сервера, а не судьба письма.
+  postfix:
+    image: boky/postfix:v5.1.0-debian
+    container_name: kmp-smtp-postfix
+    ports:
+      - "1587:587"
+    environment:
+      ALLOWED_SENDER_DOMAINS: example.com
+      RELAYHOST: ""
+      POSTFIX_myhostname: postfix.test
+      # Без этого Postfix требует разрешать релей по сети, а тесты ходят с адреса контейнера.
+      POSTFIX_mynetworks: 0.0.0.0/0
+      # Получатель должен быть локальным. Иначе Postfix отвергает example.com с 556 nullMX
+      # (домен явно объявил, что почту не принимает), а Mailpit такое берёт молча.
+      # Ради этой разницы Postfix здесь и стоит.
+      POSTFIX_mydestination: "postfix.test, localhost"
+      # Без этого Postfix ищет получателя в /etc/aliases.lmdb, которого в образе нет, и
+      # отвечает 451 «Temporary lookup failure». static:all значит «любой локальный
+      # получатель существует»: доставка нас не интересует, интересует ответ на RCPT.
+      # Пустое значение сюда передать нельзя — образ пропускает пустые переменные.
+      POSTFIX_local_recipient_maps: "static:all"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "postfix status || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
   # Implicit TLS — сценарий сабмишна на 465 (`docs/rfc/rfc8314.txt`).
   mailpit-tls:
     image: axllent/mailpit:v1.30.7
