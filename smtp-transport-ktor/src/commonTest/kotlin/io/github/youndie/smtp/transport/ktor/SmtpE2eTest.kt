@@ -34,8 +34,8 @@ class SmtpE2eTest {
     fun `a real server accepts a message`() =
         runTest {
             val host = e2eHostOrSkip() ?: return@runTest
-            val port = environmentVariable("SMTP_E2E_PORT")?.toInt() ?: DEFAULT_PORT
-            val recipient = environmentVariable("SMTP_E2E_RECIPIENT") ?: DEFAULT_RECIPIENT
+            val port = environmentVariable("SMTP_E2E_PORT")?.takeIf { it.isNotBlank() }?.toInt() ?: DEFAULT_PORT
+            val recipient = environmentVariable("SMTP_E2E_RECIPIENT")?.takeIf { it.isNotBlank() } ?: DEFAULT_RECIPIENT
             // Unique per run: the server keeps what earlier runs sent, and a fixed subject
             // would make the search find somebody else's message.
             val subject = "kmp-smtp-client e2e ${nextRunId()}"
@@ -81,7 +81,9 @@ class SmtpE2eTest {
         host: String,
         subject: String,
     ) {
-        val apiPort = environmentVariable("SMTP_E2E_API_PORT")?.toInt() ?: return
+        // A variable set to an empty string is how a workflow says "not this run". Blank has to
+        // mean absent, or the check dies on "".toInt() instead of being skipped.
+        val apiPort = environmentVariable("SMTP_E2E_API_PORT")?.takeIf { it.isNotBlank() }?.toInt() ?: return
 
         val api = HttpClient(CIO)
         val raw =
@@ -180,7 +182,7 @@ class SmtpE2eTest {
          * itself is indistinguishable from a gate that passes.
          */
         fun e2eHostOrSkip(): String? {
-            val host = environmentVariable("SMTP_E2E_HOST")
+            val host = environmentVariable("SMTP_E2E_HOST")?.takeIf { it.isNotBlank() }
             if (host != null) return host
 
             if (environmentVariable("SMTP_E2E_REQUIRED") != null) {

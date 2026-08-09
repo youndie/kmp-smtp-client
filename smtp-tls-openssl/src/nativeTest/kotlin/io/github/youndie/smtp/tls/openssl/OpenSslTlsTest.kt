@@ -127,7 +127,7 @@ class OpenSslTlsTest {
                 return@runTest
             }
 
-            val port = environment("SMTP_TLS_E2E_PORT")?.toInt() ?: DEFAULT_TLS_PORT
+            val port = environment("SMTP_TLS_E2E_PORT")?.takeIf { it.isNotBlank() }?.toInt() ?: DEFAULT_TLS_PORT
             withContext(Dispatchers.Default) { block(host, port, ca) }
         }
 

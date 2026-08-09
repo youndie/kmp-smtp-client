@@ -79,7 +79,7 @@ class StartTlsE2eTest {
             }
 
             // STARTTLS runs on the plain submission port, not on the implicit-TLS one.
-            val port = environment("SMTP_E2E_PORT")?.toInt() ?: DEFAULT_PORT
+            val port = environment("SMTP_E2E_PORT")?.takeIf { it.isNotBlank() }?.toInt() ?: DEFAULT_PORT
             withContext(Dispatchers.Default) { block(host, port, ca) }
         }
 
