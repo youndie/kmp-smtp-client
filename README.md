@@ -2,7 +2,7 @@
 
 [![ktlint](https://img.shields.io/badge/ktlint%20code--style-%E2%9D%A4-FF4081.svg)](https://ktlint.github.io/)
 [![kotlin](https://img.shields.io/badge/Kotlin-2.4.10-blue?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![native](https://img.shields.io/badge/Native-blue?logoColor=white)](https://kotlinlang.org)
+[![platform](https://img.shields.io/badge/platform-linuxX64-blue?logo=linux&logoColor=white)](#platform-support)
 [![smtp-client](https://reposilite.kotlin.website/api/badge/latest/snapshots/io/github/youndie/smtp-client?name=smtp-client&color=40c14a&prefix=v)](https://reposilite.kotlin.website/#/snapshots/io/github/youndie/smtp-client)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -32,6 +32,23 @@ exactly where it needs to be visible. This library implements it instead, over s
 - Message building: RFC 5322 headers, `multipart/alternative`, attachments, encoded words
 - Anything a rule forbids is refused rather than worked around: a line break inside an address, a
   subject that would add headers of somebody else's choosing, credentials over a cleartext channel
+
+## Platform support
+
+**`linuxX64` is the platform this is built for and the only one it is claimed to work on.** It is
+where every milestone is closed: the whole test suite runs there, including TLS against a real
+server and end to end against Mailpit and Postfix.
+
+| | |
+|---|---|
+| `linuxX64` | supported — full suite, TLS and end to end in CI |
+| `jvm` | everything but TLS-through-`SSLEngine` shares the same code and runs in CI; not claimed yet only because nothing has been released |
+| `macosArm64` | the development host: unit tests run in CI, TLS works, no end to end |
+| `linuxArm64`, `macosX64`, `mingwX64`, `iosArm64` | compile in every build; no test has ever been executed on them, and there is no TLS provider for Windows or Apple |
+| `js`, `wasmJs` | `smtp-core`, `smtp-sasl` and `smtp-mime` only — parsing and building a message. There is no TCP socket in a browser and no Node transport yet, so nothing can be sent from there |
+
+Compiling is not the same as working, and this table draws the line where it actually is: a target
+whose tests have never run says nothing about whether the code behaves there.
 
 ## Add dependencies
 
@@ -123,10 +140,6 @@ never offered is an error rather than a silent downgrade.
 | `smtp-sasl` | the seven mechanisms |
 | `smtp-mime` | building messages |
 | `smtp-testing` | a scripted transport and a fake SMTP server |
-
-Targets: `linuxX64`, `linuxArm64`, `macosX64`, `macosArm64`, `mingwX64`, `iosArm64`, `jvm`, and
-`js` / `wasmJs` for the modules that are useful without a socket. TLS exists on Linux, macOS and the
-JVM; Windows and Apple mobile compile but have no provider yet.
 
 ## Testing
 
