@@ -1,5 +1,7 @@
 plugins {
-    id("smtp.kmp.web")
+    // Not smtp.kmp.web: a session needs a transport, and there is none on js or wasm (M-84a).
+    // The modules that are useful on their own there — core, sasl, mime — keep those targets.
+    id("smtp.kmp")
 }
 
 kotlin {

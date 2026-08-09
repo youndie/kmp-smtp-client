@@ -98,7 +98,7 @@ M-31 (сценарный транспорт) сделан здесь, а не в
 - [x] **M-31** `:smtp-testing`: сценарный транспорт («сервер сказал X, ждём от клиента Y») для юнит-тестов
 - [x] **M-32** `:smtp-transport-ktor` на `ktor-network` 3.5.2, таргет `linuxX64`
 - [x] **M-33** Чтение ответов отдельной корутиной, независимо от записи — условие безопасного PIPELINING (`rfc2920.txt:183`)
-- [ ] **M-34** Фейковый SMTP-сервер в `:smtp-testing` поверх `ktor-network` для интеграционных тестов
+- [x] **M-34** Фейковый SMTP-сервер в `:smtp-testing` поверх `ktor-network`: строгий режим ловит то, что Mailpit пропускает
 - [x] **M-35** SMTP-сервер для интеграционного набора: Mailpit в `docker-compose.yml` и сервисным контейнером в CI ([риск 3](docs/research/research-architecture.md))
 - [x] **M-36** Сквозной тест: отправка письма без TLS и без AUTH на настоящий сервер в контейнере
 
@@ -219,7 +219,7 @@ Debian кладёт `opensslconf.h` в `include/<triplet>/openssl`; линков
 - [x] **M-82** `macosX64` / `macosArm64` — поддерживаемая платформа: TLS через тот же OpenSSL-модуль, тесты гоняются на хосте
 - [ ] **M-83** Apple-таргеты: TLS через Network.framework / Security ([D2](docs/research/research-architecture.md)). `iosArm64` пока только компилируется
 - [ ] **M-81a** TLS на Windows: Schannel либо OpenSSL — нужен Windows-хост, cinterop кросс-компиляцией не собрать
-- [x] **M-84** `js` / `wasmJs` под Node для чистых модулей (`core`, `client`, `sasl`, `testing`); браузерный вариант не публикуется — TCP там отсутствует ([D5](docs/research/research-architecture.md))
+- [x] **M-84** `js` / `wasmJs` под Node для модулей, полезных без сокета (`core`, `sasl`, `mime`); браузерный вариант не публикуется — TCP там отсутствует ([D5](docs/research/research-architecture.md))
 - [ ] **M-84a** Транспорт под Node (`node:net`): у `ktor-network` js-таргет есть, но E2E-тестам нужен доступ к переменным окружения из js
 
 **GATE закрыт.** Полная сборка зелёная на macOS (все таргеты компилируются, тесты `jvm` +
